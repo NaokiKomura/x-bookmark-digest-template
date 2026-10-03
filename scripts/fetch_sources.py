@@ -4,6 +4,9 @@
 ページを読み取る情報源はサイト側の変更で動かなくなる前提で扱い、失敗した情報源は errors に記録して
 ほかの情報源の処理を続ける。
 
+公式ブログは、どのブログも公開日が max_age_days（3日）以内の記事だけを新着にする。
+公開日が一覧やフィードにない記事は本文を取って日付を読む（その本文は fetch_articles が使い回す）。
+
 入力: config/sources.json、前日の data/sources/YYYY-MM-DD.json（連続日数）、state/seen_urls.json
 出力: data/sources/YYYY-MM-DD.json（SourcesFile。本文と Jev の結果は後続のスクリプトが足す）、state/seen_urls.json
 """
@@ -12,11 +15,13 @@ from __future__ import annotations
 
 import os
 import sys
+from collections.abc import Callable
 from datetime import date, timedelta
 from typing import Any
 
 import httpx
 
+from scripts.fetch_articles import fetch_article
 from scripts.lib import actions, parsers
 from scripts.lib.models import (
     BlogItem,
@@ -127,6 +132,13 @@ def fetch_blog(fetcher: Fetcher, blog: dict[str, Any]) -> list[ParsedEntry]:
 # ---------- 組み立て ----------
 
 
+def article_date(fetcher: Fetcher, item: ParsedEntry) -> date | None:
+    """記事の本文を取って公開日を読む。取った本文は data/articles/ に残り、fetch_articles が使い回す。"""
+    url = clean_url(item["url"])
+    record = fetch_article(fetcher.http, fetcher.robots, url_key(url), url)
+    return parsers.to_date(record.get("published"))
+
+
 def blog_id(blog: dict[str, Any]) -> str:
     """state/seen_urls.json のキー。"""
     return f"{blog['company']}/{blog['blog']}"
@@ -135,26 +147,40 @@ def blog_id(blog: dict[str, Any]) -> str:
 def select_new_blog_items(
     items: list[ParsedEntry],
     seen: list[str] | None,
-    kind: str,
     day: date,
     rules: dict[str, Any],
+    date_of: Callable[[ParsedEntry], date | None],
 ) -> list[ParsedEntry]:
-    """既読 URL にない記事を新着とする。
+    """既読 URL にない記事のうち、公開日が max_age_days 以内のものを新着とする（どのブログも同じ期間）。
 
-    - 初回（そのブログの既読が未記録）の一覧ページは、既読として記録するだけで新着にしない。
-    - 公開日がわかる記事は max_age_days より古ければ新着にしない（フィードの古い記事の掘り起こし対策）。
+    - 公開日が一覧やフィードにない記事は、date_of で記事の本文から読む（1ブログ max_new_per_blog 件まで）。
+    - それでも日付がわからない記事は、そのブログの初回（既読が未記録）だけ新着にしない
+      （過去の記事を一度に新着扱いしないため）。2回目以降は前回の一覧との差分なので新着にする。
     """
-    if seen is None and kind == "page":
-        return []
+    first_run = seen is None
     known = set(seen or [])
     oldest = day - timedelta(days=rules.get("max_age_days", 3))
-
-    def is_fresh(item: ParsedEntry) -> bool:
+    limit = rules.get("max_new_per_blog", 10)
+    fresh: list[ParsedEntry] = []
+    lookups = 0
+    for item in items:
+        if len(fresh) >= limit:
+            break
+        if clean_url(item["url"]) in known:
+            continue
         published = item.get("published")
-        return clean_url(item["url"]) not in known and (published is None or published >= oldest)
-
-    fresh = [i for i in items if is_fresh(i)]
-    return fresh[: rules.get("max_new_per_blog", 10)]
+        if published is None and lookups < limit:
+            lookups += 1
+            published = date_of(item)
+            if published is not None:
+                item = {**item, "published": published}
+        if published is None:
+            if first_run:
+                continue
+        elif published < oldest:
+            continue
+        fresh.append(item)
+    return fresh
 
 
 def iso_or_none(value: date | None) -> str | None:
@@ -297,7 +323,9 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
             record_error(f"blog:{bid}", error)
             continue
         seen = seen_state["urls"].get(bid)
-        new = select_new_blog_items(items, seen, blog["kind"], day, conf["blog_rules"])
+        new = select_new_blog_items(
+            items, seen, day, conf["blog_rules"], lambda item: article_date(fetcher, item)
+        )
         known = {clean_url(i["url"]) for i in out["blogs"]}
         added = [to_blog_item(i, blog) for i in new if clean_url(i["url"]) not in known]
         out["blogs"].extend({i["url"]: i for i in added}.values())

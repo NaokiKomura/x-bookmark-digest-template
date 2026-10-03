@@ -11,18 +11,72 @@ RULES = {"max_age_days": 3, "max_new_per_blog": 10}
 DAY = date(2026, 10, 3)
 
 
+def no_date(item):
+    return None
+
+
 def test_select_new_blog_items_skips_old_and_seen():
     items = parsers.feed(fixture_bytes("sources/openai_news.rss"))
-    assert [i["title"] for i in fs.select_new_blog_items(items, None, "feed", DAY, RULES)] == [
+    assert [i["title"] for i in fs.select_new_blog_items(items, None, DAY, RULES, no_date)] == [
         "New & shiny"
     ]
-    assert fs.select_new_blog_items(items, ["https://openai.com/index/a"], "feed", DAY, RULES) == []
+    assert (
+        fs.select_new_blog_items(items, ["https://openai.com/index/a"], DAY, RULES, no_date) == []
+    )
 
 
-def test_select_new_blog_items_first_page_run_only_seeds():
-    page = [{"title": "p", "url": "https://www.anthropic.com/news/x", "published": None}]
-    assert fs.select_new_blog_items(page, None, "page", DAY, RULES) == []
-    assert len(fs.select_new_blog_items(page, [], "page", DAY, RULES)) == 1
+def test_select_new_blog_items_reads_dates_for_undated_items():
+    page = [
+        {"title": "new", "url": "https://www.anthropic.com/news/new", "published": None},
+        {"title": "old", "url": "https://www.anthropic.com/news/old", "published": None},
+        {"title": "unknown", "url": "https://www.anthropic.com/news/unknown", "published": None},
+    ]
+    dates = {"new": date(2026, 10, 2), "old": date(2026, 9, 1)}
+
+    def date_of(item):
+        return dates.get(item["title"])
+
+    first = fs.select_new_blog_items(page, None, DAY, RULES, date_of)
+    assert [(i["title"], i["published"]) for i in first] == [("new", date(2026, 10, 2))]
+    # 2回目以降は、日付がわからなくても前回との差分なので新着にする
+    later = fs.select_new_blog_items(page, [], DAY, RULES, date_of)
+    assert [i["title"] for i in later] == ["new", "unknown"]
+
+
+def test_select_new_blog_items_limits_date_lookups():
+    page = [
+        {"title": f"p{i}", "url": f"https://www.anthropic.com/news/p{i}", "published": None}
+        for i in range(30)
+    ]
+    calls = []
+
+    def date_of(item):
+        calls.append(item["title"])
+        return date(2026, 9, 1)
+
+    assert fs.select_new_blog_items(page, None, DAY, RULES, date_of) == []
+    assert len(calls) == RULES["max_new_per_blog"]
+
+
+def test_article_date_reads_and_caches_the_article(digest_root):
+    body = "<p>" + "本文です。" * 200 + "</p>"
+    html = (
+        '<html><head><meta property="article:published_time" content="2026-10-02T09:00:00Z">'
+        f"<title>Post</title></head><body><article><h1>Post</h1>{body}</article></body></html>"
+    )
+
+    def handler(request):
+        if str(request.url).endswith("/robots.txt"):
+            return httpx.Response(404)
+        return httpx.Response(200, html=html)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        got = fs.article_date(
+            fs.Fetcher(http), {"title": "Post", "url": "https://www.anthropic.com/news/post"}
+        )
+    assert got == date(2026, 10, 2)
+    key = fs.url_key("https://www.anthropic.com/news/post")
+    assert (digest_root / "data" / "articles" / f"{key}.json").exists()
 
 
 def fake_sites(request: httpx.Request) -> httpx.Response:
@@ -37,6 +91,10 @@ def fake_sites(request: httpx.Request) -> httpx.Response:
         return httpx.Response(200, content=fixture_bytes("sources/zenn_daily.json"))
     if "openai.com" in url:
         return httpx.Response(200, content=fixture_bytes("sources/openai_news.rss"))
+    if url == "https://www.anthropic.com/news":
+        return httpx.Response(
+            200, html='<a href="/news/fresh">Fresh</a><a href="/news/stale">Stale</a>'
+        )
     return httpx.Response(500)
 
 
@@ -56,6 +114,7 @@ def test_collect_records_failures_and_streaks(digest_root):
     assert out["blogs"][0]["summary"] == "Startups can choose models & tune effort."
     statuses = {f"{b['company']}/{b['blog']}": b["status"] for b in out["blog_status"]}
     assert statuses["openai/News"] == "new" and statuses["aws/AWS News Blog"] == "error"
+    assert statuses["anthropic/News"] == "none"  # 本文が取れず日付がわからない初回は新着にしない
     seen = json.loads((digest_root / "state" / "seen_urls.json").read_text())["urls"]
     assert "https://openai.com/index/b" in seen["openai/News"]
 
@@ -102,6 +161,19 @@ def test_blog_rerun_preserves_items_judgment_and_adds_only_new(digest_root, monk
         assert failed["blogs"] == added["blogs"]
         status = next(s for s in failed["blog_status"] if s["company"] == "openai")
         assert status["status"] == "error" and status["count"] == 2
+
+
+def test_first_page_run_uses_article_dates(digest_root, monkeypatch):
+    dates = {"https://www.anthropic.com/news/fresh": date(2026, 10, 2)}
+    monkeypatch.setattr(
+        fs, "article_date", lambda fetcher, item: dates.get(item["url"], date(2026, 8, 1))
+    )
+    with httpx.Client(transport=httpx.MockTransport(fake_sites)) as http:
+        out = fs.collect(http, DAY)
+    anthropic = [b for b in out["blogs"] if b["company"] == "anthropic"]
+    assert [(b["title"], b["published"]) for b in anthropic] == [("Fresh", "2026-10-02")]
+    seen = json.loads((digest_root / "state" / "seen_urls.json").read_text())["urls"]
+    assert "https://www.anthropic.com/news/stale" in seen["anthropic/News"]
 
 
 def test_blog_save_failure_does_not_advance_seen(digest_root, monkeypatch):
