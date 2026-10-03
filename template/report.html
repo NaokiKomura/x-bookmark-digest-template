@@ -72,12 +72,6 @@ h1{font-size:30px;line-height:1.3;font-weight:700;margin:2px 0 14px;letter-spaci
 .meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--ink2);margin:0 0 18px}
 .meta b{font-weight:500;color:var(--ink);font-size:16px;margin-right:2px;font-variant-numeric:tabular-nums}
 .sample{font-size:13px;color:var(--ink2);border:1px dashed var(--line);padding:6px 10px;border-radius:6px;margin:0 0 20px}
-.status{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px;padding:0;list-style:none}
-.status a{display:inline-flex;align-items:baseline;gap:6px;text-decoration:none;font-size:13px;padding:4px 11px;border-radius:6px;border:1px solid var(--line);background:var(--paper)}
-.status b{font-weight:500}
-.status .s-none{color:var(--ink3)}
-.status .s-error{color:var(--warn);font-weight:500}
-.status li.err a{border-color:var(--warn)}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px}
 .card-title{font-size:15px;font-weight:500;margin:0 0 4px}
 .note{font-size:13px;color:var(--ink3);margin:8px 0 0}
@@ -348,7 +342,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       <div class="lede-box"><p class="lede-label">今日のまとめ</p><p class="lede" id="lede"></p></div>
       <p class="meta" id="meta"></p>
       <p class="sample" id="sample" hidden>これはサンプルデータです。ルーチンが毎朝この内容を差し替えます。</p>
-      <ul class="status" id="status" aria-label="情報源ごとの取得状況"></ul>
     </header>
 
     <div class="card">
@@ -585,21 +578,8 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     var s = el('span'); s.appendChild(el('b', null, m[1])); s.appendChild(document.createTextNode(m[0])); meta.appendChild(s);
   });
 
-  var SRC_VIEW = {bookmarks: 'bm', blogs: 'blog', github: 'tr:github', qiita: 'tr:qiita', zenn: 'tr:zenn', devio: 'tr:devio'};
   var statusBy = {};
   (D.source_status || []).forEach(function(s){ statusBy[s.source] = s; });
-  var stList = document.getElementById('status');
-  (D.source_status || []).forEach(function(s){
-    var li = el('li'); if (s.status === 'error') li.className = 'err';
-    var a = el('a', {href: '#'});
-    a.appendChild(el('span', null, s.label || SRC[s.source] || s.source));
-    if (s.status === 'ok') a.appendChild(el('b', null, '新着' + (s.count || 0) + '件'));
-    else if (s.status === 'none') a.appendChild(el('span', {'class': 's-none'}, '更新なし'));
-    else a.appendChild(el('span', {'class': 's-error'}, '取得失敗'));
-    if (s.message) a.title = s.message;
-    a.addEventListener('click', function(e){ e.preventDefault(); if (SRC_VIEW[s.source]) setView(SRC_VIEW[s.source]); });
-    li.appendChild(a); stList.appendChild(li);
-  });
 
   // ---------- 絞り込みの状態 ----------
   // view: overview（概要）/ bm・bm:<トピック> / blog・blog:<企業> / tr・tr:<情報源> / filter（マップから絞り込み）
@@ -1249,7 +1229,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var companies2 = (D.blog_companies && D.blog_companies.length) ? D.blog_companies
     : (D.blogs || []).reduce(function(a, b){ if (!a.some(function(c){ return c.company === b.company; })) a.push({company: b.company, label: b.company_label, status: 'ok'}); return a; }, []);
   var NAV = [{view: 'overview', label: '概要', top: true}];
-  NAV.push({view: 'bm', label: 'ブックマーク', top: true, grp: true});
+  NAV.push({view: 'bm', label: 'ブックマーク', top: true, grp: true, status: statusBy.bookmarks && statusBy.bookmarks.status});
   themeIds.forEach(function(id){ if ((D.posts || []).some(function(p){ return p.theme === id; })) NAV.push({view: 'bm:' + id, label: tName[id], theme: id}); });
   NAV.push({view: 'blog', label: '公式テックブログ', top: true, grp: true});
   companies2.forEach(function(c){ NAV.push({view: 'blog:' + c.company, label: c.label || c.company, status: c.status}); });
