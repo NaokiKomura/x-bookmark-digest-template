@@ -108,8 +108,6 @@ h2{font-size:21px;font-weight:700;margin:0 0 6px;line-height:1.4}
 .ref .r-meta{font-size:12px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .flag{font-size:11px;font-weight:500;color:var(--warn);border:1px solid var(--warn);border-radius:4px;padding:0 6px}
 .ref.quote{border-left:3px solid var(--ink3);border-radius:2px 8px 8px 2px}
-.comment{margin:0 0 10px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--c) 10%,var(--paper));font-size:14px;color:var(--ink)}
-.comment small{display:block;font-size:12px;color:var(--ink3)}
 .kws{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
 .kw{font:inherit;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer}
 .kw.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -319,7 +317,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
    "kind": "quote_article", "title": "エージェントのツールは「少数・高抽象」にすると選択ミスが減る",
    "article": {"title": "ツールを12個から5個に統合した話", "domain": "example.com", "url": "https://example.com/post/agent-tools", "fetch_status": "ok"},
    "quoted": {"author": "Rin", "handle": "mlnotes_rin", "url": "https://x.com/mlnotes_rin/status/1839999999999999999", "claim": "ツールは多いほどエージェントの能力が上がる、という前提で設計していた。"},
-   "comment": "記事の結論に賛成しつつ、統合しすぎると説明文が長くなり逆効果だと補足している。",
    "points": ["記事: ツールを統合したら誤選択が減った", "ツールの説明に失敗例を1つ添えると効果が大きい"],
    "keywords": ["ツール設計", "精度"], "importance": 3, "read_min": 6,
    "visual": {"type": "before_after", "label": "ツールの数", "before": {"label": "統合前", "value": 12}, "after": {"label": "統合後", "value": 5}, "unit": "個"}},
@@ -331,21 +328,18 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   {"id": "s3", "theme": "devops", "author": "はる", "handle": "terminal_haru", "url": "https://x.com/terminal_haru/status/1840000000000000007",
    "kind": "article", "title": "GitHub Actionsのcronは数分〜数十分の遅れを前提に設計する",
    "article": {"title": "定期実行のジョブを時刻に依存させない", "domain": "blog.example.jp", "url": "https://blog.example.jp/cron-delay", "fetch_status": "partial"},
-   "comment": "後続のジョブは時刻ではなく成果物の有無で判断させるべきだと述べている。",
    "points": ["混雑する正時は特に遅れやすいので分をずらす", "記事の本文は一部のみ取得"],
    "keywords": ["cron", "自動化"], "importance": 3, "read_min": 4,
    "visual": {"type": "before_after", "before": {"label": "設定した時刻", "text": "6:00ちょうど"}, "after": {"label": "実際の実行", "text": "数分〜数十分遅れる"}}},
   {"id": "s4", "theme": "devops", "author": "めい", "handle": "ci_cd_mei", "url": "https://x.com/ci_cd_mei/status/1840000000000000009",
    "kind": "quote", "title": "シークレットのローテーションを自動化する3つのパターン",
    "quoted": {"author": "けん", "handle": "dotfiles_ken", "url": "https://x.com/dotfiles_ken/status/1840000000000000008", "claim": "トークンの更新を手作業でやっていて、毎回どこかで止まる。"},
-   "comment": "手作業の更新に対し、方式ごとの運用コストと安全性の違いを整理して返している。",
    "points": ["方式ごとに運用コストと安全性のバランスが違う"],
    "keywords": ["シークレット", "自動化"], "importance": 2, "read_min": 2,
    "visual": {"type": "options", "items": [{"name": "CIが自分のSecretを更新", "note": "追加サービス不要"}, {"name": "シークレットマネージャー", "note": "管理を一元化"}, {"name": "短命トークンを都度発行", "note": "漏えい時の被害が小さい"}]}},
   {"id": "s5", "theme": "product_ux", "author": "ななみ", "handle": "ux_nanami", "url": "https://x.com/ux_nanami/status/1840000000000000011",
    "kind": "article", "title": "空の状態は「次にやること」を示すための場所",
    "article": {"title": "Empty states that work", "domain": "design.example.com", "url": "https://design.example.com/empty-states", "fetch_status": "blocked"},
-   "comment": "記事を紹介し、自社の管理画面でも同じ失敗をしていたと書いている。",
    "points": ["「データがありません」だけで終わらせない", "記事の本文は未取得（タイトルと概要から要約）"],
    "keywords": ["空の状態", "導線"], "importance": 2, "read_min": 3},
   {"id": "s6", "theme": "devtools", "author": "Go", "handle": "rustacean_go", "url": "https://x.com/rustacean_go/status/1840000000000000010",
@@ -754,12 +748,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     }
     var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
     var ul = points(p); if (ul) a.appendChild(ul);
-    if (p.comment) {
-      var c = el('div', {'class': 'comment'});
-      c.appendChild(el('small', null, '@' + (p.handle || '') + ' のコメント'));
-      c.appendChild(document.createTextNode(p.comment));
-      a.appendChild(c);
-    }
     var kws = keywordsEl(p); if (kws) a.appendChild(kws);
     var f = el('div', {'class': 'foot'});
     if (p.importance >= 3) f.appendChild(el('span', {'class': 'must'}, '必読'));
