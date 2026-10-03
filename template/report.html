@@ -100,6 +100,8 @@ h2{font-size:21px;font-weight:700;margin:0 0 6px;line-height:1.4}
 .who{font-size:13px;color:var(--ink3);margin:0 0 2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
 .item h4{font-size:17px;font-weight:500;line-height:1.6;margin:0 0 8px}
+.item.head-only{padding:10px 0 12px}
+.item.head-only h4{font-size:15px;margin:0 0 4px}
 .item ul{margin:0 0 10px;padding-left:1.2em;color:var(--ink2);font-size:15px}
 .item li{margin:2px 0}
 .ref{display:grid;gap:2px;margin:0 0 10px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);font-size:14px;min-width:0}
@@ -374,7 +376,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
  ],
  "blog_companies": [
   {"company": "anthropic", "label": "Anthropic", "status": "ok", "count": 1},
-  {"company": "openai", "label": "OpenAI", "status": "none", "count": 0},
+  {"company": "openai", "label": "OpenAI", "status": "ok", "count": 1},
   {"company": "google", "label": "Google", "status": "ok", "count": 1},
   {"company": "aws", "label": "AWS", "status": "none", "count": 0}
  ],
@@ -424,9 +426,12 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
    "visual": {"type": "flow", "steps": ["計画を書き出す", "1機能ずつ実装", "進捗を記録", "次のセッションで再開"]}},
   {"id": "b2", "company": "google", "company_label": "Google", "blog": "Google Developers Blog", "theme": "cloud_infra",
    "title": "（サンプル）マネージド実行環境で関数のコールドスタートを短くする", "url": "https://developers.googleblog.com/",
-   "points": ["最小インスタンス数を1にすると初回の遅れが消える"], "keywords": ["コールドスタート"], "importance": 1, "read_min": 5, "fetch_status": "error",
+   "points": ["最小インスタンス数を1にすると初回の遅れが消える"], "keywords": ["コールドスタート"], "importance": 1, "read_min": 5, "fetch_status": "ok",
    "visual": {"type": "options", "label": "設定ごとの初回応答", "unit": "ms", "items": [{"name": "最小0（既定）", "value": 1800, "note": "毎回コールドスタートが起きうる"}, {"name": "最小1", "value": 120, "note": "常に1台待機させる"}, {"name": "起動時に事前読込", "value": 650}]}}
- ],
+,
+  {"id": "b3", "company": "openai", "company_label": "OpenAI", "blog": "News", "theme": "llm_agents",
+   "title": "（サンプル）本文を取れなかった記事は見出しだけを表示する", "url": "https://openai.com/news/",
+   "points": [], "keywords": [], "importance": 1, "read_min": 1, "fetch_status": "error"} ],
  "github": [
   {"id": "g1", "rank": 1, "title": "example/agent-harness", "url": "https://github.com/trending", "language": "TypeScript", "stars_today": 1240, "stars_total": 18300, "theme": "llm_agents", "streak_days": 2,
    "summary": "コーディングエージェントを長時間動かすための実行環境。進捗ファイルと再開の仕組みを持つ。", "keywords": ["長時間タスク", "再開性"],
@@ -1077,13 +1082,17 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       who.appendChild(el('span', null, p.blog + '・' + (tName[p.theme] || '')));
       a.appendChild(who);
       a.appendChild(el('h4', null, p.title));
-      var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
-      var ul = points(p); if (ul) a.appendChild(ul);
-      var kws = keywordsEl(p); if (kws) a.appendChild(kws);
+      // 本文を取れなかった記事は見出しとリンクだけにする
+      var headOnly = p.fetch_status === 'blocked' || p.fetch_status === 'error';
+      if (headOnly) a.classList.add('head-only');
+      else {
+        var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
+        var ul = points(p); if (ul) a.appendChild(ul);
+        var kws = keywordsEl(p); if (kws) a.appendChild(kws);
+      }
       var f = el('div', {'class': 'foot'});
-      if (p.importance >= 3) f.appendChild(el('span', {'class': 'must'}, '必読'));
-      if (FETCH_FLAG[p.fetch_status]) f.appendChild(el('span', {'class': 'flag'}, FETCH_FLAG[p.fetch_status]));
-      if (p.read_min) f.appendChild(el('span', null, '約' + p.read_min + '分'));
+      if (p.importance >= 3 && !headOnly) f.appendChild(el('span', {'class': 'must'}, '必読'));
+      if (p.read_min && !headOnly) f.appendChild(el('span', null, '約' + p.read_min + '分'));
       if (safeUrl(p.url)) f.appendChild(link(p.url, '記事を開く'));
       var rb = readButton(p); f.appendChild(rb); a.appendChild(f);
       register(p, a, rb); box.appendChild(a);

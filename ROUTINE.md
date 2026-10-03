@@ -50,7 +50,8 @@ python3 scripts/report_tools.py inputs "$DAY"
   `error` があればブックマークの取得に失敗している（`source_status` を `error` にする）。
 - `data/sources/$DAY.json` の `github`、`qiita`、`zenn`、`devio`、`blogs`、`status`、`blog_status`、`notes`、`errors`。
 - 本文は `data/articles/<article_key>.json`（`text`、`title`、`fetch_status`、`chars`）。
-  公式ブログと Qiita で `fetch_status` が `ok` 以外（サイトが取得を拒否した記事など）は、項目の `summary`（フィードの概要）とタイトルだけを材料にする。概要に書かれていないことを補って書かない。外部のサイトを取りに行かない。
+  公式ブログで `fetch_status` が `blocked` か `error`（サイトが取得を拒否した記事など）は、見出しだけを載せる（`points` と `keywords` は空の配列、`visual` なし、`read_min` は1）。見出しはタイトルと `summary`（フィードの概要）から日本語で1文にし、概要に書かれていないことを補わない。
+  Qiita で `fetch_status` が `ok` 以外は、`summary` とタイトルだけを材料にする。どちらも外部のサイトを取りに行かない。
 - `data/excluded/$DAY.json` の `items`。
 
 ### 3. 前日の要約を探す（ランキングの連続項目）
@@ -84,7 +85,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | picks | 「まず読む3件」の項目ID。全情報源から、重要度とほかの項目とのつながりで選ぶ |
 | trend | `python3 scripts/report_tools.py trend "$DAY"` の出力をそのまま使う |
 | posts | ブックマークの要約（下の表） |
-| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（ok 以外なら画面に印が出る）。`read_min` は記事の `chars`（取れなければ `summary` の文字数）÷ 500 を切り上げ、最低1・最大15 |
+| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（`blocked`・`error` なら画面には見出しだけが出る）。`read_min` は記事の `chars`（取れなければ `summary` の文字数）÷ 500 を切り上げ、最低1・最大15 |
 | blog_companies | 企業ごとの状況。`{"company", "label", "status": "ok"/"none"/"error", "count"}`。`blog_status` を企業単位にまとめる（どれか1つでも新着があれば ok、全ブログが error なら error、それ以外は none） |
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
