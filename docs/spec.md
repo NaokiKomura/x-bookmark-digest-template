@@ -6,7 +6,7 @@ Oct 3, 2026 · @古村直輝
 
 ## 概要
 
-毎朝、Xのブックマークに加えて、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）と主要5社の公式テックブログの更新を自動で集め、図解つきの要約レポートとしてclaude.aiのアーティファクトに届ける。テック系かどうかの判定とトピックの分類はTypeSafe AIの判定モデルJevで行い、要約だけをClaudeに任せる。
+毎朝、Xのブックマークに加えて、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）と主要4社の公式テックブログの更新を自動で集め、図解つきの要約レポートとしてclaude.aiのアーティファクトに届ける。テック系かどうかの判定とトピックの分類はTypeSafe AIの判定モデルJevで行い、要約だけをClaudeに任せる。
 
 前提条件は次のとおり。
 
@@ -101,7 +101,7 @@ X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ル
 | blocked | robots.txtで禁止 | タイトルと概要だけで要約し、「本文未取得」と表示する |
 | error | タイムアウトや取得エラー | 同上。翌日以降の再取得は行わない |
 
-公式ブログと Qiita の記事は、フィードの概要（RSS の description）を項目の `summary` に保存しておき、本文が取れない場合は Jev の判定と要約の材料にする。GitHub Actions のIPからの取得を拒否するサイトがあるため（2026-10-03 時点で OpenAI の記事ページと X Engineering Blog が 403。Claude の WebFetch からも 403 になるので、ルーチン側での再取得は行わない）。
+公式ブログと Qiita の記事は、フィードの概要（RSS の description）を項目の `summary` に保存しておき、本文が取れない場合は Jev の判定と要約の材料にする。GitHub Actions のIPからの取得を拒否するサイトがあるため（2026-10-03 時点で OpenAI の記事ページが 403。Claude の WebFetch からも 403 になるので、ルーチン側での再取得は行わない）。
 
 ### 要約の方針
 
@@ -181,13 +181,14 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 
 ### 公式テックブログの対象
 
+X Engineering Blog は GitHub Actions からの取得が 403 になり、2023年以降の更新もほぼないため対象から外した（2026-10-04）。
+
 | 企業 | 対象のブログ |
 | --- | --- |
 | Anthropic | News、Engineering |
 | OpenAI | News |
 | Google | Google Developers Blog、Google Research Blog |
 | AWS | AWS News Blog |
-| X | X Engineering Blog |
 
 各ブログの取得方法（2026-10-03 に確認。`config/sources.json` に登録済み）:
 
@@ -199,7 +200,6 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 | Google Developers Blog | RSS | https://developers.googleblog.com/rss/ |
 | Google Research Blog | RSS | https://research.google/blog/rss/ |
 | AWS News Blog | RSS | https://aws.amazon.com/blogs/aws/feed/ |
-| X Engineering Blog | 一覧ページの差分（RSSなし）。2023年以降の更新はほぼない | https://blog.x.com/engineering/en_us |
 
 ### 更新の判定
 

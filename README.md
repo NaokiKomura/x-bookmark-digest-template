@@ -1,6 +1,6 @@
 # x-bookmark-digest
 
-毎朝、Xのブックマークと、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）、主要5社の公式テックブログの更新を集め、
+毎朝、Xのブックマークと、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）、主要4社の公式テックブログの更新を集め、
 図解つきの要約レポートとして claude.ai のアーティファクトに届ける個人用システムのテンプレート。仕様は [docs/spec.md](docs/spec.md)。
 
 | 層 | どこで動くか | すること |

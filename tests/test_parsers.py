@@ -70,9 +70,11 @@ def test_link_list_dedupes_and_strips_badge():
 
 
 def test_link_list_pattern_for_blogs():
-    html = '<a href="/engineering/en_us/topics/insights">cat</a><a href="/engineering/en_us/topics/insights/2023/post-a">A</a>'
-    blog = next(b for b in load_config("sources.json")["blogs"] if b["company"] == "x")
+    html = '<a href="/news">一覧</a><a href="/news/post-a">A</a><a href="/news/post-a/x">B</a>'
+    blog = next(
+        b
+        for b in load_config("sources.json")["blogs"]
+        if b["blog"] == "News" and b["company"] == "anthropic"
+    )
     items = parsers.link_list(html, blog["base_url"], pattern=blog["link_pattern"])
-    assert [i["url"] for i in items] == [
-        "https://blog.x.com/engineering/en_us/topics/insights/2023/post-a"
-    ]
+    assert [i["url"] for i in items] == ["https://www.anthropic.com/news/post-a"]
