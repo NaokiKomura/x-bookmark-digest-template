@@ -12,6 +12,16 @@
 4. まず `config/sources.json` のセレクタやパターンだけで直せないか試す。だめなら `scripts/lib/parsers.py` を直す
 5. `make try` で実際のサイトから取れることを確かめる
 
+## 集める情報源を選び直す
+
+```bash
+uv run python -m scripts.configure_sources --list
+uv run python -m scripts.configure_sources --enable github,zenn,anthropic   # 選んだ ID だけになる
+make check
+```
+
+`config/enabled.json` をコミットする。公式ブログは企業単位で選ぶ（同じ `company` のブログはまとめて入切される）。
+
 ## 公式ブログを足す
 
 `config/sources.json` の `blogs` に1件足すだけでよい（コードの変更は不要）。

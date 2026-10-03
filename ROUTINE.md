@@ -90,7 +90,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | blog_companies | 企業ごとの状況。`{"company", "label", "status": "ok"/"none"/"error", "count"}`。`blog_status` を企業単位にまとめる（どれか1つでも新着があれば ok、全ブログが error なら error、それ以外は none） |
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
-| source_status | 情報源ごとの結果。`{"source": "bookmarks"/"blogs"/"github"/"qiita"/"zenn"/"devio", "label", "status": "ok"/"none"/"error", "count", "message"?, "note"?}`。GitHub の `notes.github` があれば `note` に入れる |
+| source_status | 情報源ごとの結果。`{"source": "bookmarks"/"blogs"/"github"/"qiita"/"zenn"/"devio", "label", "status": "ok"/"none"/"error", "count", "message"?, "note"?}`。GitHub の `notes.github` があれば `note` に入れる。`data/sources/$DAY.json` の `status` にない情報源（初回セットアップで外したもの）は入れない |
 | excluded | 除外した項目。`{"source": "bookmarks"/"qiita"/"zenn", "title", "tech_prob", "url"}`。`data/excluded/` の項目と、手順4の規則で自分が除外した項目 |
 
 `sample` は付けない。
@@ -143,7 +143,7 @@ python3 scripts/report_tools.py validate /tmp/report.html
 
 `lede` を「本日のデータはありません。取得ワークフロー（GitHub Actions の fetch）の実行結果を確認してください。」とし、
 `themes`、`picks`、`posts`、`blogs`、`github`、`articles`、`excluded` を空の配列、`trend` は手順5のコマンドの出力、
-`source_status` は6つの情報源すべてを `{"status": "error", "count": 0, "message": "データなし"}` にして、手順6から続ける。
+`source_status` はブックマークと `config/enabled.json` で選ばれている情報源（ファイルがなければ6つすべて）を `{"status": "error", "count": 0, "message": "データなし"}` にして、手順6から続ける。
 
 ### 8. 生成を終了する
 

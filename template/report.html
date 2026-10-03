@@ -1249,10 +1249,16 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var NAV = [{view: 'overview', label: '概要', top: true}];
   NAV.push({view: 'bm', label: 'ブックマーク', top: true, grp: true, status: statusBy.bookmarks && statusBy.bookmarks.status});
   themeIds.forEach(function(id){ if ((D.posts || []).some(function(p){ return p.theme === id; })) NAV.push({view: 'bm:' + id, label: tName[id], theme: id}); });
-  NAV.push({view: 'blog', label: '公式テックブログ', top: true, grp: true});
-  companies2.forEach(function(c){ NAV.push({view: 'blog:' + c.company, label: c.label || c.company, status: c.status}); });
-  NAV.push({view: 'tr', label: 'トレンド', top: true, grp: true});
-  TREND_SRC.forEach(function(s){ var st = statusBy[s]; if (items.some(function(p){ return p._src === s; }) || st) NAV.push({view: 'tr:' + s, label: SRC[s], status: st && st.status}); });
+  // 初回セットアップで外した情報源はデータに出てこないので、サイドバーにも出さない
+  if (companies2.length) {
+    NAV.push({view: 'blog', label: '公式テックブログ', top: true, grp: true});
+    companies2.forEach(function(c){ NAV.push({view: 'blog:' + c.company, label: c.label || c.company, status: c.status}); });
+  }
+  var trendSrc = TREND_SRC.filter(function(s){ return statusBy[s] || items.some(function(p){ return p._src === s; }); });
+  if (trendSrc.length) {
+    NAV.push({view: 'tr', label: 'トレンド', top: true, grp: true});
+    trendSrc.forEach(function(s){ var st = statusBy[s]; NAV.push({view: 'tr:' + s, label: SRC[s], status: st && st.status}); });
+  }
   var VIEW_LABEL = {}, VIEW_PARENT = {}, navEl = document.getElementById('nav'), parentView = null;
   NAV.forEach(function(n){
     VIEW_LABEL[n.view] = n.label;

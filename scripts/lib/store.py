@@ -57,6 +57,16 @@ def load_config(name: str) -> Any:
     return read_json(REPO_ROOT / "config" / name, None)
 
 
+ENABLED_PATH = REPO_ROOT / "config" / "enabled.json"
+"""初回セットアップで選んだ情報源（scripts/configure_sources.py が書く）。テンプレートには入れない。"""
+
+
+def load_enabled() -> set[str] | None:
+    """集める情報源の ID の集合。config/enabled.json がなければ None（すべて集める）。"""
+    data = read_json(ENABLED_PATH, None)
+    return None if data is None else set(data.get("sources", []))
+
+
 # ---------- data/ と state/ のパス（形は models.py） ----------
 
 

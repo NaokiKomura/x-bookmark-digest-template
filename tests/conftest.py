@@ -22,4 +22,8 @@ def digest_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
     for sub in ("data/sources", "data/excluded", "data/articles", "state"):
         (tmp_path / sub).mkdir(parents=True)
+    # 利用者の config/enabled.json（初回セットアップの結果）にテストが左右されないようにする
+    from scripts.lib import store
+
+    monkeypatch.setattr(store, "ENABLED_PATH", tmp_path / "enabled.json")
     return tmp_path

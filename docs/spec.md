@@ -180,6 +180,13 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 
 取得するURLとページの読み取り方は `config/sources.json` に定義する。ページ構造が変わったときはこのファイルとスクリプトだけを直せば済むようにする。
 
+### 集める情報源の選択
+
+X のブックマーク以外の情報源（GitHub、Qiita、Zenn、DevelopersIO、公式ブログの企業ごと）は、利用者が初回セットアップで選ぶ。
+コーディングエージェントが `config/enabled.json` がないことに気づいたら複数選択の設問で尋ね、`scripts/configure_sources.py` で書く。
+選ばれなかった情報源には接続せず、`data/sources/` の `status` と `blog_status` にも載せない。レポートのサイドバーにも出ない。
+`config/enabled.json` がなければすべて集める（既存のリポジトリの動きを変えないため）。
+
 ### 公式テックブログの対象
 
 X Engineering Blog は GitHub Actions からの取得が 403 になり、2023年以降の更新もほぼないため対象から外した（2026-10-04）。

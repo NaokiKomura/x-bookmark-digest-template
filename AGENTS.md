@@ -15,6 +15,20 @@ GitHub Actions 6:00 JST（取得層: scripts/*.py）            Claude ルーチ
 
 両層のやり取りは main の data/ のファイルだけ。外部と通信するのは取得層だけ。詳しくは [docs/architecture.md](docs/architecture.md)。
 
+## 初回セットアップ（集める情報源を選ぶ）
+
+`config/enabled.json` がないときは、ほかの作業の前に、どの情報源を集めるかを利用者に尋ねる。
+X のブックマークは常に集めるので尋ねない。選ばれなかった情報源には取得層が接続しない。
+
+1. `uv run python -m scripts.configure_sources --list` で選択肢を出す（グループごとの `id`・`label`・`note`）。
+2. グループごとに **複数選択** の設問を1つずつ出す（トレンド、公式テックブログ）。選択肢には `label` を、説明には `note`（公式ブログのブログ名）を使う。
+   Claude Code では AskUserQuestion を `multiSelect: true` で使い、1回の呼び出しに2問を入れる（1問4択まで。超えるグループは2問に分ける）。
+   ほかのエージェントでは、番号付きの一覧を示して複数の番号で答えてもらう。
+3. 選ばれた `id` をカンマ区切りで `uv run python -m scripts.configure_sources --enable <ids>` に渡す（何も選ばれなければ `--enable ""`）。
+4. `make check` を通し、`config/enabled.json` をコミットする。push は利用者に確認してから行う。
+
+選び直したいと言われたときも同じ手順で行う。
+
 ## コマンド
 
 ```bash
@@ -31,6 +45,7 @@ uv run pytest tests/test_parsers.py -k devio     # テストを絞る
 | やりたいこと | 触るファイル | 手順 |
 | --- | --- | --- |
 | サイトのページ構造が変わって「取得失敗」になった | `config/sources.json` のセレクタ、`scripts/lib/parsers.py`、`tests/fixtures/sources/` | [recipes](docs/recipes.md#ページ構造が変わった) |
+| 集める情報源を選び直す | `uv run python -m scripts.configure_sources --enable ...`（`config/enabled.json`） | [初回セットアップ](#初回セットアップ集める情報源を選ぶ) |
 | 公式ブログや情報源を足す・外す | `config/sources.json`（ブログはここだけで済む） | [recipes](docs/recipes.md#公式ブログを足す) |
 | Jev の問い・しきい値を変える | `config/jev.json` | [recipes](docs/recipes.md#jev-の問いやしきい値を変える) |
 | トピックを変える | `config/topics.json` と `template/report.html` の `TOPICS` | [recipes](docs/recipes.md#トピックを変える) |
@@ -49,9 +64,10 @@ scripts/                 入口のスクリプト（ワークフローとルー�
   fetch_articles.py        手順4   記事・README・ブログの本文
   classify_jev.py          手順5   Jev で判定
   auth_local.py            初回だけ手元で実行（リフレッシュトークンの取得）
+  configure_sources.py     初回セットアップ（集める情報源を選んで config/enabled.json に書く）
   report_tools.py          ルーチン用（標準ライブラリだけ。scripts.lib を import しない）
 scripts/lib/             入口から使う共通部品（store / urls / web / parsers / x_oauth / actions / models）
-config/                  手で編集する設定（topics / sources / jev / report）
+config/                  手で編集する設定（topics / sources / jev / report）。enabled.json は初回セットアップで作る
 state/, data/            ワークフローが毎日書く。手で編集しない
 template/report.html     レポートのテンプレート（サンプルデータ入り。ルーチンは report-data だけ差し替える）
 tests/                   テスト。tests/fixtures/ にサイトのスナップショット

@@ -4,6 +4,8 @@
 ページを読み取る情報源はサイト側の変更で動かなくなる前提で扱い、失敗した情報源は errors に記録して
 ほかの情報源の処理を続ける。
 
+config/enabled.json（初回セットアップで選んだ情報源）にない情報源は取得しない。
+
 公式ブログは、どのブログも公開日が max_age_days（3日）以内の記事だけを新着にする。
 公開日が一覧やフィードにない記事は本文を取って日付を読む（その本文は fetch_articles が使い回す）。
 
@@ -35,6 +37,7 @@ from scripts.lib.models import (
 from scripts.lib.parsers import ParsedEntry, ParsedRepo, ParseError
 from scripts.lib.store import (
     load_config,
+    load_enabled,
     previous_day,
     read_json,
     seen_urls_path,
@@ -270,6 +273,12 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
     saved: SourcesFile = read_json(sources_path(day), empty_sources(day))
     out["blogs"] = list({clean_url(i["url"]): i for i in saved["blogs"]}.values())
 
+    enabled = load_enabled()
+
+    def wanted(source_id: str) -> bool:
+        """初回セットアップで外した情報源は取りに行かない（config/enabled.json がなければすべて）。"""
+        return enabled is None or source_id in enabled
+
     def record_error(source: str, error: Exception) -> None:
         out["errors"].append(
             {"source": source, "message": f"{type(error).__name__}: {error}"[:300]}
@@ -277,20 +286,23 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
         actions.warning(f"{source}: {error}")
 
     # GitHub トレンド
-    try:
-        repos, note = fetch_github(fetcher, conf["github"], day)
-        out["github"] = [
-            to_repo_item(r, rank, streaks["github"]) for rank, r in enumerate(repos, 1)
-        ]
-        out["status"]["github"] = "ok" if out["github"] else "none"
-        if note:
-            out["notes"]["github"] = note
-    except Exception as error:  # noqa: BLE001 情報源ごとに失敗を閉じ込める
-        out["status"]["github"] = "error"
-        record_error("github", error)
+    if wanted("github"):
+        try:
+            repos, note = fetch_github(fetcher, conf["github"], day)
+            out["github"] = [
+                to_repo_item(r, rank, streaks["github"]) for rank, r in enumerate(repos, 1)
+            ]
+            out["status"]["github"] = "ok" if out["github"] else "none"
+            if note:
+                out["notes"]["github"] = note
+        except Exception as error:  # noqa: BLE001 情報源ごとに失敗を閉じ込める
+            out["status"]["github"] = "error"
+            record_error("github", error)
 
     # Qiita・Zenn・DevelopersIO のランキング（Qiita・Zenn は補充用の次点も取っておく）
     for name in RANKINGS:
+        if not wanted(name):
+            continue
         source = conf[name]
         try:
             items = fetch_ranking(fetcher, source)
@@ -306,6 +318,8 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
 
     # 公式テックブログ
     for blog in conf["blogs"]:
+        if not wanted(blog["company"]):
+            continue
         bid = blog_id(blog)
         status: BlogStatus = {
             "company": blog["company"],
@@ -337,8 +351,9 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
         )
         out["blog_status"].append({**status, "status": "new" if count else "none", "count": count})
 
-    all_failed = all(b["status"] == "error" for b in out["blog_status"])
-    out["status"]["blogs"] = "error" if all_failed else ("ok" if out["blogs"] else "none")
+    if out["blog_status"]:
+        all_failed = all(b["status"] == "error" for b in out["blog_status"])
+        out["status"]["blogs"] = "error" if all_failed else ("ok" if out["blogs"] else "none")
     # 新着を日別ファイルへ確定してから既読を進める。保存失敗で新着を失わないためである。
     write_json(sources_path(day), out)
     write_json(seen_urls_path(), seen_state)
