@@ -60,6 +60,11 @@
       "base_url": "https://www.anthropic.com"
     },
     {
+      "company": "anthropic", "company_label": "Anthropic", "blog": "claude.dev", "kind": "feed",
+      "_note": "Claude と Claude Code の開発者向けの記事（使い方、モデルごとの使い分けなど）",
+      "url": "https://claude.dev/rss.xml"
+    },
+    {
       "company": "openai", "company_label": "OpenAI", "blog": "News", "kind": "feed",
       "url": "https://openai.com/news/rss.xml"
     },

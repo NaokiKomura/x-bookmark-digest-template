@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- https://claude.dev/rss.xml の先頭2件（2026-10-04 取得） -->
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+<title>claude.dev Blog</title>
+<link>https://claude.dev/</link>
+<description>Articles, videos, and build logs from Anthropic’s developers on building with Claude and Claude Code, including tips, tricks, and points of view.</description>
+<language>en</language>
+<lastBuildDate>Thu, 01 Oct 2026 12:00:00 GMT</lastBuildDate>
+<atom:link href="https://claude.dev/rss.xml" rel="self" type="application/rss+xml"/>
+<item>
+<title>Getting started with Claude Code mods</title>
+<link>https://claude.dev/blog/getting-started-with-claude-code-mods/</link>
+<guid isPermaLink="true">https://claude.dev/blog/getting-started-with-claude-code-mods/</guid>
+<pubDate>Thu, 01 Oct 2026 12:00:00 GMT</pubDate>
+<description>Mods are hooks that ship inside plugins and run inside your Claude Code session. Build one from an empty folder, then tour two larger mods.</description>
+<dc:creator>Addy Osmani</dc:creator>
+<category>Tutorials</category>
+</item>
+<item>
+<title>Building with Claude Sonnet 5.5</title>
+<link>https://claude.dev/blog/building-with-claude-sonnet-5-5/</link>
+<guid isPermaLink="true">https://claude.dev/blog/building-with-claude-sonnet-5-5/</guid>
+<pubDate>Mon, 28 Sep 2026 12:00:00 GMT</pubDate>
+<description>When to choose Sonnet over Opus, what it costs, and how to tune it.</description>
+<dc:creator>Addy Osmani</dc:creator>
+<category>Playbooks</category>
+</item>
+</channel>
+</rss>

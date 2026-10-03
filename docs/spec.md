@@ -186,7 +186,7 @@ X Engineering Blog は GitHub Actions からの取得が 403 になり、2023年
 
 | 企業 | 対象のブログ |
 | --- | --- |
-| Anthropic | News、Engineering |
+| Anthropic | News、Engineering、claude.dev |
 | OpenAI | News |
 | Google | Google Developers Blog、Google Research Blog |
 | AWS | AWS News Blog |
@@ -197,6 +197,7 @@ X Engineering Blog は GitHub Actions からの取得が 403 になり、2023年
 | --- | --- | --- |
 | Anthropic News | 一覧ページの差分（RSSなし） | https://www.anthropic.com/news |
 | Anthropic Engineering | 一覧ページの差分（RSSなし） | https://www.anthropic.com/engineering |
+| claude.dev（Claude・Claude Code の開発者向け記事） | RSS | https://claude.dev/rss.xml |
 | OpenAI News | RSS | https://openai.com/news/rss.xml |
 | Google Developers Blog | RSS | https://developers.googleblog.com/rss/ |
 | Google Research Blog | RSS | https://research.google/blog/rss/ |

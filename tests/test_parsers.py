@@ -69,6 +69,16 @@ def test_link_list_dedupes_and_strips_badge():
     ]
 
 
+def test_feed_reads_claude_dev():
+    items = parsers.feed(fixture_bytes("sources/claude_dev.rss"))
+    assert [(i["title"], i["published"]) for i in items] == [
+        ("Getting started with Claude Code mods", date(2026, 10, 1)),
+        ("Building with Claude Sonnet 5.5", date(2026, 9, 28)),
+    ]
+    assert items[0]["url"] == "https://claude.dev/blog/getting-started-with-claude-code-mods/"
+    assert items[0]["summary"].startswith("Mods are hooks")
+
+
 def test_link_list_pattern_for_blogs():
     html = '<a href="/news">一覧</a><a href="/news/post-a">A</a><a href="/news/post-a/x">B</a>'
     blog = next(
