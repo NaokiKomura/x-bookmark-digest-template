@@ -46,12 +46,15 @@ git push origin "$(git commit-tree "$(git hash-object -t tree /dev/null)" -m 'in
 | `GH_PAT` | このリポジトリだけを対象にした fine-grained PAT。権限は **Secrets: Read and write** だけ。リフレッシュトークンの書き戻しに使う。有効期限の前に作り直す |
 
 ```bash
-gh secret set X_CLIENT_ID
-gh secret set X_CLIENT_SECRET
-gh secret set X_USER_ID
-gh secret set TYPESAFE_API_KEY
-gh secret set GH_PAT
+REPO=MY-NAME/x-bookmark-digest
+gh secret set X_CLIENT_ID -R $REPO
+gh secret set X_CLIENT_SECRET -R $REPO
+gh secret set X_USER_ID -R $REPO
+gh secret set TYPESAFE_API_KEY -R $REPO
+gh secret set GH_PAT -R $REPO
 ```
+
+`gh` のコマンドには必ず `-R`（操作するリポジトリ）を付ける。remote が2つ以上あると、`gh repo set-default` を設定していても `gh secret`・`gh variable` が別のリポジトリ（テンプレート）を操作することがある。
 
 `X_REFRESH_TOKEN` は次の手順で登録する。
 
@@ -68,12 +71,10 @@ uv run python -m scripts.auth_local --repo MY-NAME/x-bookmark-digest
 ### 4. 取得ワークフローを有効にして試す
 
 ```bash
-gh variable set DIGEST_ENABLED --body true
-gh workflow run fetch
+gh variable set DIGEST_ENABLED --body true -R $REPO
+gh workflow run fetch -R $REPO
+gh variable list -R $REPO   # 自分のリポジトリに DIGEST_ENABLED が入ったことを確かめる
 ```
-
-`upstream`（テンプレート）を remote に足していると、`gh` がどちらのリポジトリを操作するか決められずに止まる。
-その場合は先に `gh repo set-default MY-NAME/x-bookmark-digest` を実行する（または各コマンドに `-R MY-NAME/x-bookmark-digest` を付ける）。
 
 `DIGEST_ENABLED` が `true` でないと、ワークフローは何もしない（テンプレート自身や設定途中のリポジトリで失敗し続けないため）。
 実行が終わったら `git pull` して、`data/` にその日のファイルが入ったことを確かめる。
@@ -101,10 +102,11 @@ claude.ai/code/routines で次のように作り、「今すぐ実行」で1回�
 
 ```bash
 git remote add upstream https://github.com/NaokiKomura/x-bookmark-digest-template.git
-gh repo set-default MY-NAME/x-bookmark-digest   # remote が2つになるので、gh の操作先を自分のリポジトリに固定する
 git fetch upstream
 git merge upstream/main --allow-unrelated-histories   # 2回目からは --allow-unrelated-histories は不要
 ```
+
+upstream を足したあとは remote が2つになるので、`gh` のコマンドには必ず `-R MY-NAME/x-bookmark-digest` を付ける。
 
 `data/`、`state/`、`config/report.json` は自分のリポジトリの値を残す。
 
