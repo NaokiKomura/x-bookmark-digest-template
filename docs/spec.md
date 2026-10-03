@@ -16,7 +16,7 @@ Oct 3, 2026 · @古村直輝
 | TypeSafe AI | 発行済みのAPIキー。判定モデルJevでテック判定とトピック分類を行う |
 | Claude | Proプラン。Claude Codeのルーチン（クラウド版スケジュールタスク）で要約する |
 | GitHub | プライベートリポジトリ1つ。GitHub Actionsで取得と判定を動かす |
-| 情報源 | Xのブックマーク、GitHubトレンド、Qiita・Zenn・DevelopersIOのランキング、Anthropic・OpenAI・Google・AWS・Xの公式テックブログ |
+| 情報源 | Xのブックマーク、GitHubトレンド、Qiita・Zenn・DevelopersIOのランキング、Anthropic・OpenAI・Google・AWSの公式テックブログ |
 | 実行時刻 | 取得と判定 6:00、要約 7:00（日本時間） |
 | 利用者 | 本人のみ。レポートは共有しない前提 |
 
