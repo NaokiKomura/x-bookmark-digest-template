@@ -3,17 +3,8 @@ import json
 import httpx
 
 from scripts import fetch_articles as fa
-from scripts.common import RobotsChecker
-
-LONG = (
-    "<html><head><title>記事タイトル</title></head><body><article><h1>記事タイトル</h1>"
-    + "".join(
-        f"<p>これは本文の段落その{i}です。テストのために十分な長さの文章を用意しています。</p>"
-        for i in range(40)
-    )
-    + "</article></body></html>"
-)
-SHORT = "<html><body><article><p>有料記事です。続きは会員登録のうえ。</p></article></body></html>"
+from scripts.lib.web import RobotsChecker
+from tests.conftest import fixture_text
 
 
 def client(routes):
@@ -27,17 +18,16 @@ def client(routes):
 
 
 def test_ok_partial_blocked_error_and_cache(digest_root):
-    robots = "User-agent: *\nDisallow: /private/\n"
     calls = []
 
     def long_page():
         calls.append(1)
-        return httpx.Response(200, html=LONG)
+        return httpx.Response(200, html=fixture_text("articles/long.html"))
 
     routes = {
-        "/robots.txt": httpx.Response(200, text=robots),
+        "/robots.txt": httpx.Response(200, text="User-agent: *\nDisallow: /private/\n"),
         "/ok": long_page,
-        "/paid": httpx.Response(200, html=SHORT),
+        "/paid": httpx.Response(200, html=fixture_text("articles/paywall.html")),
         "/broken": httpx.Response(500),
     }
     with client(routes) as http:
@@ -56,11 +46,10 @@ def test_ok_partial_blocked_error_and_cache(digest_root):
             fa.fetch_article(http, rc, "k4", "https://example.com/broken")["fetch_status"]
             == "error"
         )
-        # 取得済みなら再取得しない
-        fa.fetch_article(http, rc, "k1", "https://example.com/ok")
+        fa.fetch_article(http, rc, "k1", "https://example.com/ok")  # 取得済みなら再取得しない
     assert len(calls) == 1
     saved = json.loads((digest_root / "data" / "articles" / "k1.json").read_text())
-    assert saved["key"] == "k1" and len(saved["text"]) <= 20_000
+    assert saved["key"] == "k1" and len(saved["text"]) <= fa.MAX_ARTICLE_CHARS
 
 
 def test_too_large_is_error(digest_root):
@@ -72,27 +61,19 @@ def test_too_large_is_error(digest_root):
     assert rec["fetch_status"] == "error"
 
 
-def test_run_updates_page_titles(digest_root):
+def test_run_replaces_page_titles(digest_root):
     sources = {
-        "github": [],
-        "qiita": [],
-        "zenn": [],
-        "blogs": [],
-        "devio": [
-            {
-                "title": "話題の記事 崩れた見出し",
-                "url": "https://dev.example.jp/ok",
-                "article_key": "d1",
-                "title_source": "page",
-            }
-        ],
-    }
+        "github": [], "qiita": [], "zenn": [], "blogs": [],
+        "devio": [{"title": "話題の記事 崩れた見出し", "url": "https://dev.example.jp/ok", "article_key": "d1", "title_source": "page"}],
+    }  # fmt: skip
     (digest_root / "data" / "sources" / "2026-10-03.json").write_text(json.dumps(sources))
     with client(
-        {"/robots.txt": httpx.Response(404), "/ok": httpx.Response(200, html=LONG)}
+        {
+            "/robots.txt": httpx.Response(404),
+            "/ok": httpx.Response(200, html=fixture_text("articles/long.html")),
+        }
     ) as http:
-        counts = fa.run(http)
-    assert counts == {"ok": 1}
+        assert fa.run(http) == {"ok": 1}
     out = json.loads((digest_root / "data" / "sources" / "2026-10-03.json").read_text())
     assert out["devio"][0]["title"] == "記事タイトル"
 

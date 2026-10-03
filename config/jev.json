@@ -1,0 +1,41 @@
+{
+  "_note": "Jev（TypeSafe AI）の問いとしきい値。問いは英語で書く（Jev の精度が最も高い言語）。問いの ID はモデルに送られないので、instructions と criteria だけで意味が通じるように書く。変えたら実データで判定を確かめてから採用する（docs/recipes.md）。トピックの選択肢は config/topics.json の description から作る。",
+  "model": "jev-latest",
+  "thresholds": {
+    "tech_accept": 0.7,
+    "tech_hold": 0.4,
+    "topic_min_prob": 0.5
+  },
+  "state_chars": 4000,
+  "max_articles_per_bookmark": 2,
+  "tech_question": {
+    "instructions": "Is `item` mainly about software development or IT technology? `item.type` says what kind of content it is. The content may be written in Japanese.",
+    "criteria": {
+      "true": {
+        "definition": "The main subject is software development or IT technology",
+        "includes": [
+          "programming, software design, testing, code review",
+          "AI, machine learning and LLMs, including how to use AI tools for work",
+          "cloud, infrastructure, DevOps, databases, networks",
+          "security and vulnerabilities",
+          "developer tools, editors, programming languages, libraries",
+          "IT products and services and their technical features",
+          "engineering careers and engineering organizations"
+        ]
+      },
+      "false": {
+        "definition": "The main subject is something other than software or IT technology",
+        "examples": [
+          "daily life, food, travel, hobbies",
+          "entertainment, sports, celebrities",
+          "politics or society without a technology focus",
+          "general business or investment talk without a technology focus"
+        ],
+        "note": "Mentioning a smartphone or app only as a tool in a non-technical story does not count"
+      }
+    }
+  },
+  "topic_question": {
+    "instructions": "Which technology topic best matches the main subject of `item`? `item.type` says what kind of content it is. The content may be written in Japanese. If it spans several topics, choose the one the content most wants to convey."
+  }
+}

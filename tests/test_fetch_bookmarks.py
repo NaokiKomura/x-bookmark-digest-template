@@ -5,6 +5,7 @@ import httpx
 import pytest
 
 from scripts import fetch_bookmarks as fb
+from scripts.lib import x_oauth
 
 USERS = [
     {"id": "u1", "username": "kato_agents", "name": "加藤"},
@@ -107,9 +108,9 @@ def test_refresh_error_raises_without_leaking_body():
 
     with (
         httpx.Client(transport=httpx.MockTransport(handler)) as http,
-        pytest.raises(fb.TokenError) as e,
+        pytest.raises(x_oauth.TokenError) as e,
     ):
-        fb.refresh_access_token(http, "cid", None, "RT-old")
+        x_oauth.refresh(http, "cid", None, "RT-old")
     assert "RT-old" not in str(e.value)
 
 
@@ -123,7 +124,7 @@ def test_write_back_failure_stops(monkeypatch):
         seen["args"], seen["input"] = args, kw["input"]
         return SimpleNamespace(returncode=1)
 
-    with pytest.raises(fb.TokenError):
+    with pytest.raises(x_oauth.TokenError):
         fb.save_refresh_token("RT-new", runner=runner)
     assert seen["args"][:3] == ["gh", "secret", "set"] and seen["input"] == "RT-new"
 
@@ -132,10 +133,10 @@ def test_main_stops_before_fetch_when_write_back_fails(digest_root, monkeypatch)
     monkeypatch.setenv("X_CLIENT_ID", "cid")
     monkeypatch.setenv("X_USER_ID", "me")
     monkeypatch.setenv("X_REFRESH_TOKEN", "RT")
-    monkeypatch.setattr(fb, "refresh_access_token", lambda *a: ("AT", "RT2"))
+    monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("AT", "RT2"))
 
     def boom(token):
-        raise fb.TokenError("write back failed")
+        raise x_oauth.TokenError("write back failed")
 
     monkeypatch.setattr(fb, "save_refresh_token", boom)
     monkeypatch.setattr(fb, "fetch_new_bookmarks", lambda *a: pytest.fail("must not fetch"))
@@ -148,7 +149,7 @@ def test_main_writes_empty_file_and_updates_seen(digest_root, monkeypatch):
     monkeypatch.setenv("X_USER_ID", "me")
     monkeypatch.setenv("X_REFRESH_TOKEN", "RT")
     (digest_root / "state" / "seen_ids.json").write_text('{"ids": ["old"]}')
-    monkeypatch.setattr(fb, "refresh_access_token", lambda *a: ("AT", "RT2"))
+    monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("AT", "RT2"))
     monkeypatch.setattr(fb, "fetch_new_bookmarks", lambda *a: [])
     assert fb.main([]) == 0
     data = json.loads((digest_root / "data" / "2026-10-03.json").read_text())
@@ -165,10 +166,10 @@ def test_api_error_is_recorded_and_seen_kept(digest_root, monkeypatch):
     out = digest_root / "gh_output"
     monkeypatch.setenv("GITHUB_OUTPUT", str(out))
     (digest_root / "state" / "seen_ids.json").write_text('{"ids": ["old"]}')
-    monkeypatch.setattr(fb, "refresh_access_token", lambda *a: ("AT", "RT2"))
+    monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("AT", "RT2"))
 
     def fail(*a):
-        raise RuntimeError("bookmarks request failed: HTTP 503")
+        raise fb.BookmarksFetchError("HTTP 503")
 
     monkeypatch.setattr(fb, "fetch_new_bookmarks", fail)
     assert fb.main([]) == 0

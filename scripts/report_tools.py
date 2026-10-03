@@ -1,5 +1,7 @@
 """ルーチン（要約層）が使う補助コマンド。標準ライブラリだけで動く（クラウド環境で依存を入れずに使える）。
 
+scripts/lib を import しない（ルーチンは python3 scripts/report_tools.py として直接実行するため）。
+
 python3 scripts/report_tools.py inputs  YYYY-MM-DD            当日の入力の有無と件数、要約が要る項目の一覧
 python3 scripts/report_tools.py trend   YYYY-MM-DD            直近14日のブックマーク件数（report-data の trend）
 python3 scripts/report_tools.py keywords [--reports DIR]      直近のレポートで使ったキーワードの一覧（表記の統一用）
@@ -24,6 +26,8 @@ VISUAL_TYPES = {"before_after", "flow", "versus", "options", "stat"}
 POST_KINDS = {"post", "quote", "article", "quote_article"}
 FETCH_STATUSES = {"ok", "partial", "blocked", "error"}
 SOURCE_STATES = {"ok", "none", "error"}
+EXCLUDED_SOURCES = {"bookmarks", "qiita", "zenn"}
+SOURCE_NAMES = {"bookmarks", "blogs", "github", "qiita", "zenn", "devio"}
 
 
 def load_topics() -> list[dict[str, str]]:
@@ -235,6 +239,9 @@ def validate_data(data: Any) -> list[str]:
         need(a.get("site") in ("qiita", "zenn", "devio"), f"articles {a.get('id')}: site が不明")
     for s in data["source_status"]:
         need(s.get("status") in SOURCE_STATES, f"source_status {s.get('source')}: status が不明")
+        need(s.get("source") in SOURCE_NAMES, f"source_status: source が不明: {s.get('source')}")
+    for x in data["excluded"]:
+        need(x.get("source") in EXCLUDED_SOURCES, f"excluded: source が不明: {x.get('source')}")
     for pid in data["picks"]:
         need(pid in ids, f"picks に存在しない項目: {pid}")
     need(len(data["picks"]) <= 3, "picks は3件まで")

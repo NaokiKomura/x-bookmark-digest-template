@@ -27,12 +27,8 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
 
-from scripts.common import root
-
-AUTHORIZE_URL = "https://x.com/i/oauth2/authorize"
-TOKEN_URL = "https://api.x.com/2/oauth2/token"
-SCOPES = "tweet.read users.read bookmark.read offline.access"
-REDIRECT_URI = "http://127.0.0.1:8765/callback"
+from scripts.lib.store import root
+from scripts.lib.x_oauth import AUTHORIZE_URL, REDIRECT_URI, SCOPES, TokenError, post_token
 
 
 def pkce_pair() -> tuple[str, str]:
@@ -117,16 +113,11 @@ def main(argv: list[str] | None = None) -> int:
         "code_verifier": verifier,
         "redirect_uri": REDIRECT_URI,
     }
-    with httpx.Client(timeout=30.0) as http:
-        if client_secret:
-            response = http.post(TOKEN_URL, data=data, auth=(client_id, client_secret))
-        else:
-            response = http.post(TOKEN_URL, data={**data, "client_id": client_id})
-    if response.is_error:
-        raise SystemExit(f"token exchange failed: HTTP {response.status_code}")
-    refresh = response.json().get("refresh_token")
-    if not refresh:
-        raise SystemExit("no refresh_token in response (is offline.access granted?)")
+    try:
+        with httpx.Client(timeout=30.0) as http:
+            refresh = str(post_token(http, client_id, client_secret or None, data)["refresh_token"])
+    except TokenError as error:
+        raise SystemExit(str(error)) from error
 
     if args.repo:
         done = subprocess.run(

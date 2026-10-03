@@ -107,29 +107,16 @@ git merge upstream/main --allow-unrelated-histories   # 2回目からは --allow
 ## 構成
 
 ```text
-.github/workflows/fetch.yml   取得と判定のワークフロー（6:00）
-scripts/fetch_bookmarks.py    トークン更新・ブックマーク取得・差分抽出
-scripts/fetch_sources.py      GitHubトレンド・ランキング・公式ブログの取得
-scripts/fetch_articles.py     リンク先記事・README・ブログ本文の取得と抽出
-scripts/classify_jev.py       Jevによるテック判定とトピック分類
-scripts/common.py             上の4つで共通の部品
-scripts/auth_local.py         初回のリフレッシュトークンを取ってSecretsに登録する
-scripts/report_tools.py       ルーチン用の補助（入力の確認、推移、キーワード、組み立て、検証。標準ライブラリだけ）
-config/topics.json            トピック一覧（固定）
-config/sources.json           追加の情報源の取得URLと読み取り方
-config/report.json            ルーチンが上書きするアーティファクトのURL
-state/seen_ids.json           取得済みの投稿ID
-state/seen_urls.json          取得済みのブログ記事URL（ブログごと）
-data/YYYY-MM-DD.json          日別の新着ブックマーク（{"date", "posts": [...]}）
-data/sources/YYYY-MM-DD.json  日別の追加の情報源
-data/excluded/YYYY-MM-DD.json テック判定で除外した項目
-data/articles/<key>.json      記事・README・ブログの本文（URLのハッシュ単位）
-template/report.html          レポートのテンプレート（サンプルデータ入り）
-ROUTINE.md                    ルーチンの手順書（プロンプト本体）
-docs/spec.md                  元の仕様書
+scripts/            取得層の入口（fetch_bookmarks → fetch_sources → fetch_articles → classify_jev）と、ルーチン用の report_tools.py
+scripts/lib/        共通部品（パスと JSON、URL、HTTP、ページの読み取り、X の OAuth、データの型）
+config/             手で編集する設定（トピック、情報源、Jev の問い、アーティファクトの URL）
+state/, data/       ワークフローが毎日書く
+template/           レポートのテンプレート（サンプルデータ入り）
+ROUTINE.md          ルーチンの手順書（プロンプト本体）
+docs/               設計（architecture）、データの形（data）、命名規則（conventions）、変更の手順（recipes）、元の仕様書（spec）
 ```
 
-`claude/reports` ブランチに `reports/YYYY-MM-DD.html` と `summaries/<key>.json` が溜まる。
+`claude/reports` ブランチに `reports/YYYY-MM-DD.html` と `summaries/<article_key>.json` が溜まる。
 
 ## 仕様書との違い
 
@@ -146,15 +133,16 @@ docs/spec.md                  元の仕様書
 
 ## 開発
 
+コーディングエージェント（Claude Code など）で改造する前提で整えている。入口は [AGENTS.md](AGENTS.md)。
+
 ```bash
-uv sync
-make check        # ruff + pytest。コミット前に必ず通す
-DIGEST_ROOT=/tmp/digest-try uv run python -m scripts.fetch_sources   # 実データの場所を汚さずに試す
+make setup     # 依存を入れる
+make check     # lint + 型 + テスト + テンプレートの検証。コミット前に必ず通す
+make try       # 実際のサイトから取得して /tmp に出す（X は呼ばない。リポジトリの data/ は汚さない）
+make preview   # サンプルデータ入りのレポートをブラウザで開く
 ```
 
-テストは外部 API を呼ばない（`httpx.MockTransport` と偽の判定関数）。
-`DIGEST_ROOT` を一時ディレクトリに向けると、data/ と state/ の読み書きがそちらに行く（config/ はリポジトリのものを読む）。
-`DIGEST_DATE=YYYY-MM-DD` でデータの日付を指定できる（手動の再実行用。ワークフローの入力 `date` と同じ）。
+よくある変更（ページ構造が変わった、ブログを足す、Jev の問いを変える、表示を変える）の手順は [docs/recipes.md](docs/recipes.md)。
 
 ## 1日あたりの外部への呼び出し
 

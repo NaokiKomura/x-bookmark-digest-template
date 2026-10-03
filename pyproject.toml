@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8.0", "ruff>=0.11"]
+dev = ["mypy>=1.15", "pytest>=8.0", "ruff>=0.11", "types-defusedxml>=0.7"]
 
 [tool.uv]
 package = false
@@ -28,3 +28,16 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["scripts"]
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+[[tool.mypy.overrides]]
+module = ["trafilatura", "trafilatura.*"]
+ignore_missing_imports = true

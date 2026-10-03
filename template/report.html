@@ -386,7 +386,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   {"id": "z3", "site": "zenn", "rank": 3, "title": "（サンプル）SwiftUIの状態管理の整理", "url": "https://zenn.dev/", "theme": "mobile", "streak_days": 1, "summary": "画面の状態をどこに置くかの判断基準。"}
  ],
  "excluded": [
-  {"source": "bookmark", "title": "週末に行った喫茶店のナポリタンがとてもおいしかった", "tech_prob": 0.04, "url": "https://x.com/"},
+  {"source": "bookmarks", "title": "週末に行った喫茶店のナポリタンがとてもおいしかった", "tech_prob": 0.04, "url": "https://x.com/"},
   {"source": "zenn", "title": "（サンプル）フリーランス1年目の確定申告", "tech_prob": 0.31, "url": "https://zenn.dev/"}
  ]
 }
@@ -904,7 +904,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var ex = D.excluded || [], exList = document.getElementById('excl-list');
   document.getElementById('excl-n').textContent = ex.length + '件';
   if (!ex.length) document.getElementById('excl').hidden = true;
-  var EX_SRC = {bookmark: 'ブックマーク', qiita: 'Qiita', zenn: 'Zenn'};
+  var EX_SRC = {bookmarks: 'ブックマーク', qiita: 'Qiita', zenn: 'Zenn'};
   ex.forEach(function(x){
     var li = el('li');
     li.appendChild(el('small', null, EX_SRC[x.source] || x.source));

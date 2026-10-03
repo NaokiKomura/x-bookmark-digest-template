@@ -86,7 +86,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
 | source_status | 情報源ごとの結果。`{"source": "bookmarks"/"blogs"/"github"/"qiita"/"zenn"/"devio", "label", "status": "ok"/"none"/"error", "count", "message"?, "note"?}`。GitHub の `notes.github` があれば `note` に入れる |
-| excluded | 除外した項目。`{"source": "bookmark"/"qiita"/"zenn", "title", "tech_prob", "url"}`。`data/excluded/` の項目と、手順4の規則で自分が除外した項目 |
+| excluded | 除外した項目。`{"source": "bookmarks"/"qiita"/"zenn", "title", "tech_prob", "url"}`。`data/excluded/` の項目と、手順4の規則で自分が除外した項目 |
 
 `sample` は付けない。
 
