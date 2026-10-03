@@ -371,6 +371,7 @@ Qiita、Zenn、DevelopersIOの1件は `kind: "article"` で、`likes`（いい�
 | date | 文字列 | レポートの日付（YYYY-MM-DD） |
 | generated\_at | 文字列 | 生成日時（ISO 8601） |
 | lede | 文字列 | 冒頭の総括（2文以内）。ブックマークと追加の情報源の両方を踏まえる |
+| section\_summaries | オブジェクト（任意） | `blogs`・`trends` それぞれで多かった話題の1〜2文。公式ブログ・トレンドの一覧の冒頭に出す |
 | themes | 配列 | その日に登場したトピック（`config/topics.json` のIDと名前）と1文の要約 |
 | picks | 配列 | 「まず読む3件」の項目ID（ブックマーク以外も選べる） |
 | trend | 配列 | 直近14日分の日付とブックマーク件数 |

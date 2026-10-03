@@ -69,6 +69,8 @@ h1{font-size:30px;line-height:1.3;font-weight:700;margin:2px 0 14px;letter-spaci
 .lede-box{margin:4px 0 20px;padding:18px 20px;border-radius:14px;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--t0);box-shadow:0 1px 0 var(--line)}
 .lede-label{margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--t0)}
 .lede{font-size:19px;font-weight:500;line-height:1.85;margin:0;max-width:38em}
+.sec-sum{margin:6px 0 14px;padding:12px 16px;border-radius:12px;background:var(--paper);border:1px solid var(--line);border-left:4px solid var(--t0)}
+.sec-sum p:last-child{margin:0;font-size:16px;font-weight:500;line-height:1.8}
 .meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--ink2);margin:0 0 18px}
 .meta b{font-weight:500;color:var(--ink);font-size:16px;margin-right:2px;font-variant-numeric:tabular-nums}
 .sample{font-size:13px;color:var(--ink2);border:1px dashed var(--line);padding:6px 10px;border-radius:6px;margin:0 0 20px}
@@ -374,11 +376,13 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
   <section id="sec-blogs">
     <div class="sec-head"><h2>公式テックブログ</h2><span class="n" id="n-blogs"></span></div>
+    <div class="sec-sum" id="sum-blogs" hidden><p class="lede-label">公式ブログのまとめ</p><p></p></div>
     <div id="blogs"></div>
   </section>
 
   <section id="sec-trends">
     <h2>今日のトレンド</h2>
+    <div class="sec-sum" id="sum-trends" hidden><p class="lede-label">トレンドのまとめ</p><p></p></div>
     <div id="sec-github">
       <div class="sec-head"><h3 style="font-size:17px;margin:14px 0 0">GitHub　今日スターが増えたリポジトリ</h3></div>
       <p class="fail" id="fail-github" hidden></p>
@@ -401,6 +405,10 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
  "generated_at": "2026-10-03T07:06:00+09:00",
  "sample": true,
  "lede": "ブックマークはエージェントの運用設計が中心で、公式ブログでもツール連携の更新が続きました。トレンドでは、Jevを試す記事がQiita・Zenn・DevelopersIOのすべてで上位に入っています。",
+ "section_summaries": {
+  "blogs": "長時間動くエージェントの足場づくりと、実行環境の待ち時間を減らす設定の記事が中心でした。",
+  "trends": "エージェントの実行環境とシークレット管理のリポジトリが伸び、記事では判断特化モデルを試す話題が目立ちました。"
+ },
  "themes": [
   {"id": "llm_agents", "name": "LLM・AIエージェント", "summary": "ツールの絞り込みや中間成果の保存など、エージェントを実運用で安定させる工夫が中心です。"},
   {"id": "devops", "name": "DevOps・CI/CD", "summary": "cronの遅延やシークレットの更新など、自動化を壊れにくくする話題です。"},
@@ -1308,6 +1316,11 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       sec.classList.toggle('solo', v !== 'filter');
     });
     document.getElementById('ov').hidden = !ov;
+    [['sum-blogs', 'blogs', 'blog'], ['sum-trends', 'trends', 'tr']].forEach(function(x){
+      var box = document.getElementById(x[0]), text = (D.section_summaries || {})[x[1]];
+      box.hidden = !text || v.split(':')[0] !== x[2];
+      if (text) box.lastChild.textContent = text;
+    });
     document.getElementById('empty').hidden = ov || shown > 0;
 
     var head = document.getElementById('view-head');

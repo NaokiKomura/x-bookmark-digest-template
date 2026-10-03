@@ -90,3 +90,10 @@ def test_validate_checks_visual_shapes():
     errors = rt.validate_data(data)
     for word in ("matrix", "flow", "options", "versus", "stat.compare"):
         assert any(word in e for e in errors), word
+
+
+def test_validate_checks_section_summaries():
+    data = sample()
+    assert data["section_summaries"]["blogs"]
+    data["section_summaries"] = {"blogs": 1, "other": "x"}
+    assert any("section_summaries" in e for e in rt.validate_data(data))

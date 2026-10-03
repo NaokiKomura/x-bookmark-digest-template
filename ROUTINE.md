@@ -81,6 +81,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | date | `$DAY` |
 | generated_at | 生成日時（ISO 8601、+09:00） |
 | lede | 冒頭の総括（2文以内）。ブックマークと追加の情報源の両方を踏まえる |
+| section_summaries | `{"blogs", "trends"}`。公式ブログ全体、トレンド（GitHub・Qiita・Zenn・DevelopersIO）全体で、どんな話題が多かったかを1〜2文で。新着がない情報源は省いてよい |
 | themes | その日に登場したトピック。`{"id", "name", "summary"}`。id と name は `config/topics.json` のもの。summary は1文 |
 | picks | 「まず読む3件」の項目ID。全情報源から、重要度とほかの項目とのつながりで選ぶ |
 | trend | `python3 scripts/report_tools.py trend "$DAY"` の出力をそのまま使う |

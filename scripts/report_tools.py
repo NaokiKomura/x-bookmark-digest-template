@@ -178,6 +178,13 @@ def validate_data(data: Any) -> list[str]:
         "date が YYYY-MM-DD でない",
     )
     need(isinstance(data.get("lede"), str), "lede がない")
+    sums = data.get("section_summaries", {})
+    need(
+        isinstance(sums, dict)
+        and set(sums) <= {"blogs", "trends"}
+        and all(isinstance(v, str) for v in sums.values()),
+        "section_summaries は blogs・trends の文字列だけ",
+    )
     for key in (
         "themes",
         "picks",
