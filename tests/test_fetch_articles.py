@@ -82,3 +82,11 @@ def test_strip_site_suffix():
     assert fa.strip_site_suffix("判断特化型AIを試した | DevelopersIO") == "判断特化型AIを試した"
     assert fa.strip_site_suffix("A | B | DevelopersIO") == "A | B"
     assert fa.strip_site_suffix("区切りなし") == "区切りなし"
+
+
+def test_readme_uses_size_limit_and_records_failure(digest_root):
+    repo = {"title": "owner/repo", "url": "https://github.com/owner/repo"}
+    with client({"/readme": httpx.Response(200, text="x" * 2_000_001)}) as http:
+        record = fa.fetch_readme(http, "readme", repo)
+    assert record["fetch_status"] == "error"
+    assert "larger than" in record["error"]

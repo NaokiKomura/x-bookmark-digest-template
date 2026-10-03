@@ -50,3 +50,14 @@ def test_trend_counts_missing_days_as_zero(monkeypatch, tmp_path):
         and trend[-1] == {"date": "2026-10-03", "count": 2}
         and trend[0]["count"] == 0
     )
+
+
+def test_build_rejects_invalid_data_without_overwriting_output(tmp_path):
+    import pytest
+
+    src, out = tmp_path / "invalid.json", tmp_path / "report.html"
+    src.write_text("{}")
+    out.write_text("previous report")
+    with pytest.raises(SystemExit, match="検証に失敗"):
+        rt.cmd_build(src, out)
+    assert out.read_text() == "previous report"

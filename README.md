@@ -6,7 +6,8 @@
 | 層 | どこで動くか | すること |
 | --- | --- | --- |
 | 取得層 | GitHub Actions（`fetch.yml`、毎日 6:00 JST） | トークン更新、ブックマーク・情報源・本文の取得、Jev での判定、main へのコミット |
-| 要約層 | Claude Code のルーチン（毎日 7:00 JST、Sonnet） | main のデータを読んで要約し、アーティファクトを更新、`claude/reports` に履歴を保存 |
+| 要約層 | Claude Code のルーチン（毎日 7:00 JST、Sonnet） | main のデータを読み、report-data と要約キャッシュを生成 |
+| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | 検証してアーティファクトを更新、`claude/reports` に履歴を保存 |
 | 表示層 | claude.ai のアーティファクト | `template/report.html` に report-data を差し込んだもの |
 
 X API と TypeSafe AI の認証情報は GitHub Secrets にだけ置き、ルーチンには渡さない。Claude は API キーを使わず、サブスクの利用枠で動く。
@@ -91,11 +92,17 @@ claude.ai/code/routines で次のように作り、「今すぐ実行」で1回�
 | 環境 | Default（ネットワークは Trusted） |
 | 環境変数・API credentials | なし |
 | コネクタ | すべて外す |
-| プロンプト | このリポジトリの ROUTINE.md の手順に従って、今日のレポートを作って公開してください。 |
+| プロンプト | このリポジトリの ROUTINE.md の手順に従って、今日の report-data と要約キャッシュをローカルに作ってください。公開は別の担当者が行います。 |
 
-初回は必ず「今すぐ実行」で行う。アーティファクトを新しく作るときは Claude が確認を求めるので、実行中のセッションを開いて許可する（定期実行では確認に答えられない）。ルーチンの報告にその URL が出る。
-その URL を `config/report.json` の `artifact_url` に書いて main にコミットすると、2回目からは同じアーティファクトが上書きされる。
-既存のアーティファクトの上書きは確認なしで行われる（共有を「リンクを知っている全員」にしていない場合。公開共有にすると毎回確認が必要になる）。
+要約側にはmainと過去の要約を読み取り専用で渡し、出力ディレクトリだけを書き込み可能にする。
+Gitの書き込み資格情報・Artifactツールを与えない。実行環境側でこの制限を設定できない場合は、
+書き込み権限を持つルーチンでの自動公開を有効にせず、担当者が手動で [PUBLISH.md](PUBLISH.md) に従って公開する。
+プロンプトや「credentialsなし」という設定だけでは、組み込みのGit・Artifact権限まで制限した保証にはならない。
+
+初回は「今すぐ実行」でJSONの生成を確認する。公開担当者は別の信頼した環境でスキーマを検証し、
+信頼したテンプレートからHTMLを組み立てる。初回だけアーティファクトを作成し、そのURLを
+`config/report.json` の `artifact_url` に設定する。通常運用では同じ公開先と `claude/reports` にだけ保存する。
+公開担当には外部の記事本文や生成されたコマンドを渡さない。
 
 運用開始から数日は、ルーチンの実行ログを開いて結果を確かめる（実行ステータスが緑でも、タスクが成功したとは限らない）。
 
@@ -119,7 +126,8 @@ scripts/lib/        共通部品（パスと JSON、URL、HTTP、ページの読
 config/             手で編集する設定（トピック、情報源、Jev の問い、アーティファクトの URL）
 state/, data/       ワークフローが毎日書く
 template/           レポートのテンプレート（サンプルデータ入り）
-ROUTINE.md          ルーチンの手順書（プロンプト本体）
+ROUTINE.md          要約生成の手順書（プロンプト本体）
+PUBLISH.md          別環境での検証・公開の手順書
 docs/               設計（architecture）、データの形（data）、命名規則（conventions）、変更の手順（recipes）、元の仕様書（spec）
 ```
 
@@ -148,7 +156,7 @@ make preview   # サンプルデータ入りのレポートをブラウザで開
 | X API（ブックマーク） | 自分のデータの読み取り（Owned Read）$0.001/件。返した件数ぶん課金されるので、1日1ページ20件 = $0.02/日 | **約$0.6** |
 | X API（展開したデータ） | 引用元の投稿（Post read $0.005/件）と投稿者（User read $0.010/件）が別に数えられる場合の上限。1日に投稿者20人・引用元3件として約$0.22/日。同じ UTC 日の重複は1回だけ課金 | 0〜約$7 |
 | TypeSafe AI（Jev） | 入力 $0.042/100万トークン（出力は無料）。テック判定つき約4,200トークン/回、トピックのみ約1,900トークン/回 × 約70回/日 ≒ 20万トークン/日 ≒ 600万トークン/月 | **約$0.25** |
-| Claude | ルーチン1回/日。API キーは使わずサブスクの利用枠内（Pro はルーチンの実行が1日5回まで。利用枠は通常の会話と共通） | 追加なし（Pro 以上の契約が前提） |
+| Claude | 要約ルーチン1回/日 + 担当者による検証・公開。API キーは使わずサブスクの利用枠内（Pro はルーチンの実行が1日5回まで。利用枠は通常の会話と共通） | 追加なし（Pro 以上の契約が前提） |
 | GitHub Actions | 取得ワークフロー約2〜3分/日 ≒ 90分/月 + CI。プライベートリポジトリの無料枠は Free プランで2,000分/月（超えると Linux $0.006/分） | $0 |
 | GitHub のストレージ | 記事本文が約1MB/日（実測: 64件で約1MB）増える。1年で約0.35GB（git の圧縮前） | $0（リポジトリの推奨上限 数GB の範囲） |
 
@@ -156,6 +164,8 @@ make preview   # サンプルデータ入りのレポートをブラウザで開
 X API の初回の支払い登録で $20 分のクレジットが付く。実際の金額は、運用開始から数日後に X の Developer Console の利用状況で確かめる。
 
 参考: [X API Pricing](https://docs.x.com/x-api/getting-started/pricing)、[TypeSafe Models](https://docs.typesafe.ai/models)、[Introducing routines in Claude Code](https://claude.com/blog/introducing-routines-in-claude-code)、[GitHub Actions の課金](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+
+接続先制限・総時間制限による追加のAPI呼び出しや再試行はない。要約と公開の分離は手動公開を前提とし、追加のモデル呼び出しは行わない。
 
 ## 1日あたりの外部への呼び出し
 
@@ -165,6 +175,9 @@ X API の初回の支払い登録で $20 分のクレジットが付く。実際
 | 各サイト | 一覧ページ・フィード各1回（10か所）、robots.txt はホストごとに1回、本文は未取得の記事だけ（約50〜70件） |
 | GitHub API | README 10回（Trending が読めない日は Search API 1回） |
 | TypeSafe AI（Jev） | 1項目1回（約70回） |
+
+各取得は公開IPに限定し、リダイレクト先も検査する。robots.txtと本文の取得全体は30秒で中断する。
+期限を超えた記事は `error` として保存し、後続に進む（POSIXのメインスレッドで実行する）。
 
 ## 注意
 

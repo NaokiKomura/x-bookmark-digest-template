@@ -241,6 +241,8 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
     seen_state: SeenUrls = read_json(seen_urls_path(), {"urls": {}})
     streaks = previous_streaks(day)
     out = empty_sources(day)
+    saved: SourcesFile = read_json(sources_path(day), empty_sources(day))
+    out["blogs"] = list({clean_url(i["url"]): i for i in saved["blogs"]}.values())
 
     def record_error(source: str, error: Exception) -> None:
         out["errors"].append(
@@ -284,7 +286,9 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
             "company_label": blog["company_label"],
             "blog": blog["blog"],
             "status": "none",
-            "count": 0,
+            "count": sum(
+                i["company"] == blog["company"] and i["blog"] == blog["blog"] for i in out["blogs"]
+            ),
         }
         try:
             items = fetch_blog(fetcher, blog)
@@ -294,14 +298,21 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
             continue
         seen = seen_state["urls"].get(bid)
         new = select_new_blog_items(items, seen, blog["kind"], day, conf["blog_rules"])
-        out["blogs"].extend(to_blog_item(i, blog) for i in new)
+        known = {clean_url(i["url"]) for i in out["blogs"]}
+        added = [to_blog_item(i, blog) for i in new if clean_url(i["url"]) not in known]
+        out["blogs"].extend({i["url"]: i for i in added}.values())
         # 一覧に出ている記事はすべて既読にする（新着の上限で落とした分も、翌日に掘り起こさない）
         listed = [clean_url(i["url"]) for i in items]
         seen_state["urls"][bid] = list(dict.fromkeys(listed + (seen or [])))[:MAX_SEEN_PER_BLOG]
-        out["blog_status"].append({**status, "status": "new" if new else "none", "count": len(new)})
+        count = sum(
+            i["company"] == blog["company"] and i["blog"] == blog["blog"] for i in out["blogs"]
+        )
+        out["blog_status"].append({**status, "status": "new" if count else "none", "count": count})
 
     all_failed = all(b["status"] == "error" for b in out["blog_status"])
     out["status"]["blogs"] = "error" if all_failed else ("ok" if out["blogs"] else "none")
+    # 新着を日別ファイルへ確定してから既読を進める。保存失敗で新着を失わないためである。
+    write_json(sources_path(day), out)
     write_json(seen_urls_path(), seen_state)
     return out
 

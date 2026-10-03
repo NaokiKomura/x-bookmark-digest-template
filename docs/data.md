@@ -72,6 +72,10 @@
 
 Qiita の項目と公式ブログの項目は、フィードの概要を `summary` に持つ（Zenn・DevelopersIO・一覧ページのブログは空）。本文が取れなかった記事（サイトがボットからの取得を拒否する場合など）は、Jev の判定とルーチンの要約でこれを本文の代わりに使う。
 
+同日再取得では、保存済みの `blogs`（Jev判定を含む）に新着をURLで重複排除して追加する。
+`blog_status.count` は当日の保存済み件数である。取得失敗でも項目と件数を保持し、状態は `error` にする。
+日別ファイルの保存後に既読URLを更新する。
+
 `streak_days` は前日のファイルにも同じ URL があれば前日の値 + 1。2以上なら、ルーチンは前日の要約を再利用する。
 `title_source: "page"` は一覧ページから拾った見出し（崩れやすい）で、記事のタイトルが取れたら `fetch_articles.py` が置き換えて `"article"` にする。
 
@@ -79,6 +83,9 @@ Qiita の項目と公式ブログの項目は、フィードの概要を `summar
 
 `ExcludedFile`。`items` は `{"source": "bookmarks" | "qiita" | "zenn", "id", "title", "url", "tech_prob"}`。
 ブックマークの `id` は投稿 ID、記事は `article_key`。
+同日再分類では既存履歴を読み、`source` と `id` の組で重複排除して更新する。
+当日の入力で判定が `status: ok` かつ `tech` / `hold` に変わった項目は履歴から外す。
+入力にない項目や `unavailable` の項目の履歴は保持する。
 
 ## state/
 

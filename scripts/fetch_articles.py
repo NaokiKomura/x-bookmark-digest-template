@@ -7,7 +7,7 @@
 1. x.com、twitter.com、画像・動画の直リンクは記事として扱わない（fetch_bookmarks.py の時点で除く）。
 2. article_key（URL のハッシュ）で data/articles/ を確認し、取得済みなら再取得しない。
 3. robots.txt で禁止されているサイトは取得しない（fetch_status: blocked）。
-4. タイムアウト10秒、上限2MBで取得し、trafilatura でタイトル、サイト名、公開日、本文を取り出す。
+4. 通信待ち10秒、robots.txtと本文を合わせた総時間30秒、上限2MBで取得し、trafilatura でタイトル、サイト名、公開日、本文を取り出す。
 5. 本文は先頭から最大20,000文字で保存する。500文字未満なら partial。
 取得エラーは error として記録し、翌日以降も再取得しない。
 """
@@ -41,7 +41,7 @@ from scripts.lib.store import (
     write_json,
 )
 from scripts.lib.urls import domain_of
-from scripts.lib.web import FetchError, RobotsChecker, fetch_bytes, make_client
+from scripts.lib.web import FetchError, RobotsChecker, fetch_bytes, fetch_deadline, make_client
 
 MAX_ARTICLE_CHARS = 20_000
 PARTIAL_CHARS = 500
@@ -98,20 +98,21 @@ def fetch_article(http: httpx.Client, robots: RobotsChecker, key: str, url: str)
     if cached is not None:
         return cached
     record: ArticleRecord
-    if not robots.allowed(url):
-        record = build_record(key, url, "blocked")
-    else:
-        try:
-            body, final_url = fetch_bytes(http, url)
-            info = extract(body, final_url)
-            status: FetchStatus = (
-                "ok" if len(info.get("text") or "") >= PARTIAL_CHARS else "partial"
-            )
-            record = build_record(key, url, status, info)
-        except FetchError as error:
-            record = build_record(key, url, "error", {"error": str(error)})
-        except Exception as error:  # noqa: BLE001 抽出ライブラリの想定外の失敗も1件の失敗に閉じ込める
-            record = build_record(key, url, "error", {"error": type(error).__name__})
+    try:
+        with fetch_deadline():
+            if not robots.allowed(url):
+                record = build_record(key, url, "blocked")
+            else:
+                body, final_url = fetch_bytes(http, url)
+                info = extract(body, final_url)
+                status: FetchStatus = (
+                    "ok" if len(info.get("text") or "") >= PARTIAL_CHARS else "partial"
+                )
+                record = build_record(key, url, status, info)
+    except FetchError as error:
+        record = build_record(key, url, "error", {"error": str(error)})
+    except Exception as error:  # noqa: BLE001 抽出の失敗も1件の失敗に閉じ込める
+        record = build_record(key, url, "error", {"error": type(error).__name__})
     write_json(path, record)
     return record
 
@@ -129,10 +130,8 @@ def fetch_readme(http: httpx.Client, key: str, repo: RepoItem) -> ArticleRecord:
     info: Extracted = {"title": repo["title"], "site_name": "GitHub"}
     status: FetchStatus
     try:
-        response = http.get(f"{GITHUB_API}/repos/{repo['title']}/readme", headers=headers)
-        if response.is_error:
-            raise FetchError(f"HTTP {response.status_code}")
-        info["text"] = response.text
+        body, _ = fetch_bytes(http, f"{GITHUB_API}/repos/{repo['title']}/readme", headers=headers)
+        info["text"] = body.decode("utf-8", "replace")
         status = "ok"
     except (FetchError, httpx.HTTPError) as error:
         info["error"] = str(error) or type(error).__name__

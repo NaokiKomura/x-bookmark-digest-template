@@ -142,6 +142,9 @@ def embed(data: Any) -> str:
 
 def cmd_build(data_path: Path, out_path: Path) -> None:
     data = json.loads(data_path.read_text(encoding="utf-8"))
+    errors = validate_data(data)
+    if errors:
+        raise SystemExit("report-data の検証に失敗: " + "; ".join(errors))
     template = TEMPLATE.read_text(encoding="utf-8")
     if not BLOCK.search(template):
         raise SystemExit("template has no report-data block")

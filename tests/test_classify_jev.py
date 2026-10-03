@@ -200,3 +200,33 @@ def test_questions_build_with_sdk():
         )
         is not None
     )
+
+
+def test_rerun_preserves_exclusions_and_updates_rejudged_items(digest_root):
+    bpath = digest_root / "data/2026-10-03.json"
+    spath = digest_root / "data/sources/2026-10-03.json"
+    xpath = digest_root / "data/excluded/2026-10-03.json"
+    bpath.write_text(json.dumps({"posts": [post("1", "nontech")]}))
+    spath.write_text(json.dumps({"qiita": [entry("nontech", 1)], "zenn": []}))
+    judge = fake_judge({"nontech": 0.1, "new": 0.1})
+    assert cj.run(cj.Classifier(judge, TH), CONF, lambda e: None)["excluded"] == 2
+    original = json.loads(xpath.read_text())
+    assert cj.run(cj.Classifier(judge, TH), CONF, lambda e: None) == {
+        "calls": 0,
+        "failures": 0,
+        "excluded": 2,
+    }
+    assert json.loads(xpath.read_text()) == original
+    bookmarks = json.loads(bpath.read_text())
+    bookmarks["posts"].append(post("2", "new"))
+    bpath.write_text(json.dumps(bookmarks))
+    spath.write_text(json.dumps({"qiita": [entry("nontech", 1)], "zenn": []}))
+    assert cj.run(cj.Classifier(judge, TH), CONF, lambda e: None)["excluded"] == 3
+    bookmarks = json.loads(bpath.read_text())
+    bookmarks["posts"][0]["jev"] = None
+    bpath.write_text(json.dumps(bookmarks))
+    spath.write_text(json.dumps({"qiita": [entry("nontech", 1)], "zenn": []}))
+    assert cj.run(cj.Classifier(fake_judge(), TH), CONF, lambda e: None)["excluded"] == 1
+    assert [(i["source"], i["id"]) for i in json.loads(xpath.read_text())["items"]] == [
+        ("bookmarks", "2")
+    ]

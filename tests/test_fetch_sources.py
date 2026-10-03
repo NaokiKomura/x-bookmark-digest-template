@@ -70,3 +70,47 @@ def test_robots_disallow_marks_source_as_error(digest_root):
         out = fs.collect(http, DAY)
     assert out["status"]["qiita"] == "error"
     assert "robots" in next(e["message"] for e in out["errors"] if e["source"] == "qiita")
+
+
+def test_blog_rerun_preserves_items_judgment_and_adds_only_new(digest_root, monkeypatch):
+    with httpx.Client(transport=httpx.MockTransport(fake_sites)) as http:
+        first = fs.collect(http, DAY)
+        first["blogs"][0]["jev"] = {"status": "ok", "topic": "llm_agents", "topic_prob": 0.9}
+        fs.write_json(fs.sources_path(DAY), first)
+        again = fs.collect(http, DAY)
+        assert again["blogs"] == first["blogs"]
+        original = fs.fetch_blog
+
+        def fetch_blog(fetcher, blog):
+            entries = original(fetcher, blog)
+            if blog["company"] == "openai":
+                entries.append(
+                    {"url": "https://openai.com/index/new", "title": "New", "published": DAY}
+                )
+            return entries
+
+        monkeypatch.setattr(fs, "fetch_blog", fetch_blog)
+        added = fs.collect(http, DAY)
+        assert len(added["blogs"]) == 2
+        assert added["blogs"][0] == first["blogs"][0]
+        status = next(s for s in added["blog_status"] if s["company"] == "openai")
+        assert status["status"] == "new" and status["count"] == 2
+        monkeypatch.setattr(
+            fs, "fetch_blog", lambda *args: (_ for _ in ()).throw(fs.FetchError("failed"))
+        )
+        failed = fs.collect(http, DAY)
+        assert failed["blogs"] == added["blogs"]
+        status = next(s for s in failed["blog_status"] if s["company"] == "openai")
+        assert status["status"] == "error" and status["count"] == 2
+
+
+def test_blog_save_failure_does_not_advance_seen(digest_root, monkeypatch):
+    def fail(path, data):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(fs, "write_json", fail)
+    import pytest
+
+    with httpx.Client(transport=httpx.MockTransport(fake_sites)) as http, pytest.raises(OSError):
+        fs.collect(http, DAY)
+    assert not fs.seen_urls_path().exists()

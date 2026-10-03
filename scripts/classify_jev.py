@@ -247,11 +247,10 @@ def classify_bookmarks(
 ) -> None:
     """除外になった投稿もファイルには残し、tech_label: excluded の印を付ける。"""
     for post in data["posts"]:
-        if judged(post["jev"]):
-            continue
-        articles = {lk["article_key"]: load_article(lk["article_key"]) for lk in post["links"]}
-        jev = clf.tech(bookmark_state(post, articles, conf))
-        post["jev"] = jev
+        if not judged(post["jev"]):
+            articles = {lk["article_key"]: load_article(lk["article_key"]) for lk in post["links"]}
+            post["jev"] = clf.tech(bookmark_state(post, articles, conf))
+        jev = cast(TechJev, post["jev"])
         if jev["tech_label"] == "excluded":
             title = post["text"].replace("\n", " ")[:120]
             excluded.append(
@@ -327,7 +326,8 @@ def run(
     clf: Classifier, conf: dict[str, Any], fetch_reserve_article: Callable[[RankingItem], object]
 ) -> dict[str, int]:
     day = today_jst()
-    excluded: list[ExcludedItem] = []
+    saved: ExcludedFile = read_json(excluded_path(day), {"date": day.isoformat(), "items": []})
+    excluded: list[ExcludedItem] = list(saved["items"])
 
     bpath = bookmarks_path(day)
     bookmarks: BookmarksFile | None = read_json(bpath, None)
@@ -344,6 +344,25 @@ def run(
         sources.pop("reserve", None)
         write_json(spath, sources)
 
+    # 判定が採用へ変わった項目だけ過去の除外から外す。unavailable は履歴を消さない。
+    accepted: set[tuple[str, str]] = set()
+    if bookmarks is not None:
+        accepted.update(
+            ("bookmarks", p["id"])
+            for p in bookmarks["posts"]
+            if p["jev"] and p["jev"]["status"] == "ok" and p["jev"]["tech_label"] != "excluded"
+        )
+    if sources is not None:
+        accepted.update(
+            (name, i["article_key"])
+            for name in ("qiita", "zenn")
+            for i in sources[name]
+            if i["jev"]
+            and i["jev"]["status"] == "ok"
+            and i["jev"].get("tech_label") in ("tech", "hold")
+        )
+    merged = {(i["source"], i["id"]): i for i in excluded}
+    excluded = [i for key, i in merged.items() if key not in accepted]
     out: ExcludedFile = {"date": day.isoformat(), "items": excluded}
     write_json(excluded_path(day), out)
     return {"calls": clf.calls, "failures": clf.failures, "excluded": len(excluded)}
