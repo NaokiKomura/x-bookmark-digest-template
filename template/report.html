@@ -50,7 +50,7 @@ main{max-width:760px;margin:0 auto;padding:28px 20px 56px;min-width:0}
 .crumb{font-size:13px;color:var(--ink3);margin:0}
 .crumb button{font:inherit;color:var(--ink2);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline}
 .view-meta{font-size:14px;color:var(--ink2);margin:0 0 8px}
-.view-meta .clear{font:inherit;font-size:13px;margin-left:10px;padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
+.clear{font:inherit;font-size:13px;margin-left:10px;padding:2px 10px;border-radius:999px;border:1px solid var(--line);background:var(--paper);color:var(--ink);cursor:pointer}
 @media (max-width:1000px){
   .layout{display:block}
   .sidebar{position:fixed;left:0;top:0;bottom:0;height:auto;width:min(300px,86vw);z-index:20;transform:translateX(-102%);transition:transform .25s;box-shadow:0 0 24px rgba(0,0,0,.25)}
@@ -79,23 +79,26 @@ h1{font-size:30px;line-height:1.3;font-weight:700;margin:2px 0 14px;letter-spaci
 .card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px}
 .card-title{font-size:15px;font-weight:500;margin:0 0 4px}
 .note{font-size:13px;color:var(--ink3);margin:8px 0 0}
-#map{width:100%;min-height:200px}
-#map svg{display:block;width:100%;height:auto;overflow:visible}
-.m-link{stroke-opacity:.5;transition:stroke-opacity .25s}
-.m-node{cursor:pointer;transition:opacity .25s}
-.m-node.dim{opacity:.2}
-.m-link.dim{stroke-opacity:.08}
-.m-theme circle{stroke:var(--paper);stroke-width:2}
-.m-theme text{fill:var(--paper);font-size:13px;font-weight:700}
-.m-kw rect{fill:var(--paper);stroke:var(--line);stroke-width:1}
-.m-kw.shared rect{stroke:var(--ink);stroke-width:1.6}
-.m-kw text{fill:var(--ink);font-size:12px}
-.m-kw.on rect{fill:var(--ink);stroke:var(--ink)}
-.m-kw.on text{fill:var(--paper)}
-.m-node:focus-visible{outline:none}
-.m-node:focus-visible rect,.m-node:focus-visible circle{stroke:var(--focus);stroke-width:3}
-.kw-fallback{display:flex;flex-wrap:wrap;gap:8px}
-.filters{display:grid;gap:8px;margin:14px 0 0}
+#map{width:100%}
+#map svg{display:block;width:100%;height:auto}
+.map-note{margin:0 0 10px}
+.tm{cursor:pointer;outline:none}
+.tm rect{stroke:var(--paper);stroke-width:0;transition:opacity .2s}
+.tm-name{fill:var(--paper);font-size:13px;font-weight:700;pointer-events:none}
+.tm-n{fill:var(--paper);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none}
+#map.hovering .tm:not(.on) rect{opacity:.5}
+.tm.on rect{stroke:var(--ink);stroke-width:2}
+.tm:focus-visible rect{stroke:var(--focus);stroke-width:3}
+.tm-fallback{display:flex;flex-wrap:wrap;gap:8px}
+.map-detail{margin-top:10px;padding:10px 12px;border-radius:10px;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 9%,var(--paper));font-size:14px}
+.map-detail:empty{display:none}
+.md-head{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin:0}
+.md-head .dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.md-head span:last-child{color:var(--ink2);font-size:13px}
+.md-sum{margin:4px 0 0;color:var(--ink2)}
+.md-kw{margin:2px 0 0;color:var(--ink3);font-size:13px}
+.map-detail .clear{margin:8px 0 0}
+.card-sub{font-size:13px;font-weight:500;color:var(--ink2);margin:16px 0 8px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{font:inherit;font-size:14px;display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
@@ -366,11 +369,11 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
     <div class="card">
       <p class="card-title">今日の話題マップ</p>
-      <div id="map" aria-label="トピックとキーワードのつながり"></div>
-      <p class="note">丸がトピック（数字は件数）、四角が複数の項目に出てきたキーワードです。太枠のキーワードは2つ以上のトピックにまたがっています。押すと関連する項目だけに絞り込めます。ブックマーク、ブログ、トレンドのすべてが対象です。</p>
-      <div class="filters">
-        <div class="chips" id="chips" role="group" aria-label="トピックで絞り込み"></div>
-      </div>
+      <p class="note map-note">面積が件数です。押すと、その話題の項目をブックマーク・ブログ・トレンドから集めて表示します。</p>
+      <div id="map"></div>
+      <div class="map-detail" id="map-detail" aria-live="polite"></div>
+      <p class="card-sub" id="kw-head">よく出たキーワード</p>
+      <div class="chips" id="kwchips" role="group" aria-label="キーワードで絞り込み"></div>
       <div class="pile-wrap">
         <div class="pile-grid" id="pile" aria-label="項目ごとの既読状況"></div>
         <p class="note">1マスが1件です。塗りつぶしは未読、枠だけは既読。右上に点があるマスは記事付きの投稿です。マスを押すとその項目に移動します。</p>
@@ -633,91 +636,96 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     .sort(function(a,b){ return kwItems[b].length - kwItems[a].length; }).slice(0, 14);
   var themeIds = TOPICS.map(function(t){ return t[0]; }).filter(function(id){ return items.some(function(p){ return p.theme === id; }); });
 
-  var mapEls = { kw: {}, theme: {}, links: [] }, lastW = 0;
+  var lastW = 0;
   function setKeyword(k){ var off = state.view === 'filter' && state.keyword === k; setView(off ? 'overview' : 'filter', null, off ? null : k); }
   function setTheme(t){ setView(t ? 'filter' : 'overview', t, null); }
 
+  // ---------- 話題マップ（面積図） ----------
+  // 面積が件数。四角に名前と件数を書き、乗せる・フォーカスすると下に内訳を出し、押すとその話題の項目を集めて表示する
+  var GROUP_OF = {bookmarks: 'ブックマーク', blogs: '公式ブログ', github: 'トレンド', qiita: 'トレンド', zenn: 'トレンド', devio: 'トレンド'};
+  var topicStats = themeIds.map(function(id){
+    var list = items.filter(function(p){ return p.theme === id; }), by = {}, kws = {};
+    list.forEach(function(p){
+      by[GROUP_OF[p._src]] = (by[GROUP_OF[p._src]] || 0) + 1;
+      (p.keywords || []).forEach(function(k){ kws[k] = (kws[k] || 0) + 1; });
+    });
+    var th = (D.themes || []).filter(function(t){ return t.id === id; })[0];
+    return {id: id, n: list.length, by: by, list: list, summary: th && th.summary,
+      kws: Object.keys(kws).sort(function(a, b){ return kws[b] - kws[a]; }).slice(0, 4)};
+  }).sort(function(a, b){ return b.n - a.n; });
+  var mapBox = document.getElementById('map'), mapDetail = document.getElementById('map-detail'), tmEls = {};
+  var noHover = !!(window.matchMedia && matchMedia('(hover: none)').matches);
+  if (noHover) document.querySelector('.map-note').textContent = '面積が件数です。押すと内訳が出て、もう一度押すかボタンで、その話題の項目をブックマーク・ブログ・トレンドから集めて表示します。';
+  function showTopic(t){
+    Object.keys(tmEls).forEach(function(id){ tmEls[id].classList.toggle('on', id === t.id); });
+    mapDetail.textContent = ''; mapDetail.style.setProperty('--c', cvar(t.id));
+    var h = el('p', {'class': 'md-head'});
+    h.appendChild(el('span', {'class': 'dot', 'aria-hidden': 'true'}));
+    h.appendChild(el('b', null, tName[t.id]));
+    var unread = t.list.filter(function(p){ return !read[p.id]; }).length;
+    h.appendChild(el('span', null, t.n + '件・未読' + unread + '件（' + ['ブックマーク', '公式ブログ', 'トレンド'].filter(function(g){ return t.by[g]; }).map(function(g){ return g + ' ' + t.by[g]; }).join('、') + '）'));
+    mapDetail.appendChild(h);
+    if (t.summary) mapDetail.appendChild(el('p', {'class': 'md-sum'}, t.summary));
+    if (t.kws.length) mapDetail.appendChild(el('p', {'class': 'md-kw'}, '主なキーワード：' + t.kws.join('、')));
+    var go = el('button', {'type': 'button', 'class': 'clear'}, 'この話題の項目を見る →');
+    go.addEventListener('click', function(){ setTheme(t.id); });
+    mapDetail.appendChild(go);
+  }
   function renderMap(){
-    var box = document.getElementById('map'), W = box.clientWidth || 600;
-    if (Math.abs(W - lastW) < 8 && box.firstChild) return;
-    lastW = W; box.textContent = ''; mapEls = { kw: {}, theme: {}, links: [] };
-    if (!window.d3 || !themeIds.length) {
-      var fb = el('div', {'class': 'kw-fallback'});
-      mapKws.forEach(function(k){
-        var b = el('button', {'class': 'kw', 'type': 'button'}, k + '（' + kwItems[k].length + '）');
-        b.addEventListener('click', function(){ setKeyword(k); });
-        mapEls.kw[k] = { fb: b }; fb.appendChild(b);
+    var W = mapBox.clientWidth || 600;
+    if (Math.abs(W - lastW) < 8 && mapBox.firstChild) return;
+    lastW = W; mapBox.textContent = ''; tmEls = {};
+    if (!topicStats.length) { mapBox.parentNode.hidden = true; return; }
+    if (!window.d3) {
+      var fb = el('div', {'class': 'tm-fallback'});
+      topicStats.forEach(function(t){
+        var b = el('button', {'type': 'button', 'class': 'chip'});
+        var d = el('span', {'class': 'dot', 'aria-hidden': 'true'}); d.style.setProperty('--c', cvar(t.id)); b.appendChild(d);
+        b.appendChild(document.createTextNode(tName[t.id])); b.appendChild(el('span', {'class': 'n'}, t.n));
+        b.addEventListener('click', function(){ setTheme(t.id); }); b.addEventListener('focus', function(){ showTopic(t); });
+        fb.appendChild(b);
       });
-      box.appendChild(fb); return;
+      mapBox.appendChild(fb); showTopic(topicStats[0]); return;
     }
-    var H = W < 520 ? 440 : 370, nodes = [], links = [];
-    themeIds.forEach(function(id){
-      var n = items.filter(function(p){ return p.theme === id; }).length;
-      var r = 14 + Math.sqrt(n) * 6.5;
-      nodes.push({ id: 't:' + id, kind: 'theme', tid: id, n: n, r: r, hw: r, hh: r });
-    });
-    mapKws.forEach(function(k){
-      var w = k.length * 12.5 + 22, ts = {};
-      kwItems[k].forEach(function(p){ ts[p.theme] = (ts[p.theme] || 0) + 1; });
-      var tids = Object.keys(ts).filter(function(id){ return themeIds.indexOf(id) >= 0; });
-      nodes.push({ id: 'k:' + k, kind: 'kw', k: k, w: w, r: w / 2 + 2, hw: w / 2, hh: 13, shared: tids.length >= 2, themes: tids });
-      tids.forEach(function(id){ links.push({ source: 'k:' + k, target: 't:' + id, w: ts[id], theme: id }); });
-    });
-    var sim = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(links).id(function(d){ return d.id; }).distance(function(l){ return l.target.r + 46; }).strength(0.7))
-      .force('charge', d3.forceManyBody().strength(-240))
-      .force('collide', d3.forceCollide().radius(function(d){ return d.r + 6; }).iterations(3))
-      .force('x', d3.forceX(W / 2).strength(0.06))
-      .force('y', d3.forceY(H / 2).strength(W < 520 ? 0.05 : 0.09))
-      .stop();
-    function clamp(){ nodes.forEach(function(n){ n.x = Math.max(n.hw + 4, Math.min(W - n.hw - 4, n.x)); n.y = Math.max(n.hh + 4, Math.min(H - n.hh - 4, n.y)); }); }
-    for (var i = 0; i < 360; i++) { sim.tick(); clamp(); }
-
-    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'group', 'aria-label': '話題マップ' });
-    var gl = sv('g'), gn = sv('g'); svg.appendChild(gl); svg.appendChild(gn);
-    links.forEach(function(l){
-      var line = sv('line', { x1: l.source.x, y1: l.source.y, x2: l.target.x, y2: l.target.y, 'class': 'm-link', 'stroke-width': 1 + l.w * 1.2 });
-      line.style.stroke = cvar(l.theme); gl.appendChild(line); mapEls.links.push({ el: line, kw: l.source.k, theme: l.theme });
-    });
-    nodes.forEach(function(n){
-      var g = sv('g', { 'class': 'm-node ' + (n.kind === 'theme' ? 'm-theme' : 'm-kw' + (n.shared ? ' shared' : '')), transform: 'translate(' + n.x + ',' + n.y + ')', tabindex: '0', role: 'button' });
-      var act;
-      if (n.kind === 'theme') {
-        g.setAttribute('aria-label', tName[n.tid] + '：' + n.n + '件');
-        var c = sv('circle', { r: n.r }); c.style.fill = cvar(n.tid); g.appendChild(c);
-        g.appendChild(sv('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, n.n));
-        g.appendChild(sv('title', null, tName[n.tid]));
-        act = function(){ setTheme(state.theme === n.tid ? null : n.tid); };
-        mapEls.theme[n.tid] = g;
-      } else {
-        g.setAttribute('aria-label', 'キーワード ' + n.k + '：' + kwItems[n.k].length + '件');
-        g.appendChild(sv('rect', { x: -n.w / 2, y: -13, width: n.w, height: 26, rx: 6 }));
-        g.appendChild(sv('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, n.k));
-        act = function(){ setKeyword(n.k); };
-        mapEls.kw[n.k] = { g: g, themes: n.themes };
+    var H = W < 520 ? 300 : 240;
+    var root = d3.hierarchy({children: topicStats}).sum(function(d){ return d.n || 0; });
+    d3.treemap().size([W, H]).paddingInner(3).round(true).tile(d3.treemapSquarify.ratio(1.3))(root);
+    var svg = sv('svg', {viewBox: '0 0 ' + W + ' ' + H, role: 'group', 'aria-label': 'トピックごとの件数'});
+    root.leaves().forEach(function(lf){
+      var t = lf.data, w = lf.x1 - lf.x0, h = lf.y1 - lf.y0, name = tName[t.id];
+      var g = sv('g', {'class': 'tm', transform: 'translate(' + lf.x0 + ',' + lf.y0 + ')', tabindex: '0', role: 'button', 'aria-label': name + '：' + t.n + '件。押すとこの話題の項目を表示'});
+      var r = sv('rect', {width: w, height: h, rx: 6}); r.style.fill = cvar(t.id); g.appendChild(r);
+      var fit = Math.floor((w - 14) / 13), short = name.length > fit ? name.slice(0, Math.max(1, fit - 1)) + '…' : name;
+      if (h >= 54 && fit >= 2) {
+        g.appendChild(sv('text', {x: 8, y: 20, 'class': 'tm-name'}, short));
+        g.appendChild(sv('text', {x: 8, y: 44, 'class': 'tm-n'}, t.n));
+      } else if (h >= 24 && fit >= 3) {
+        g.appendChild(sv('text', {x: 8, y: h / 2 + 5, 'class': 'tm-name'}, short + ' ' + t.n));
+      } else if (w >= 18 && h >= 18) {
+        g.appendChild(sv('text', {x: w / 2, y: h / 2 + 5, 'text-anchor': 'middle', 'class': 'tm-name'}, t.n));
       }
-      g.addEventListener('click', act);
-      g.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
-      gn.appendChild(g);
+      g.appendChild(sv('title', null, name + '：' + t.n + '件'));
+      g.addEventListener('mouseenter', function(){ mapBox.classList.add('hovering'); showTopic(t); });
+      g.addEventListener('focus', function(){ showTopic(t); });
+      // マウスのない端末では、1回目のタップで内訳を見せ、選んだ四角をもう一度押すと移動する
+      g.addEventListener('click', function(){ if (noHover && !g.classList.contains('on')) { showTopic(t); return; } setTheme(t.id); });
+      g.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setTheme(t.id); } });
+      svg.appendChild(g); tmEls[t.id] = g;
     });
-    box.appendChild(svg);
+    svg.addEventListener('mouseleave', function(){ mapBox.classList.remove('hovering'); });
+    mapBox.appendChild(svg);
+    showTopic(topicStats[0]);
   }
 
-  // ---------- 絞り込みのボタン ----------
-  var chips = document.getElementById('chips');
-  function chip(label, count, themeId){
-    var b = el('button', {'class': 'chip', 'type': 'button', 'aria-pressed': 'false'});
-    if (themeId) { var d = el('span', {'class': 'dot', 'aria-hidden': 'true'}); d.style.setProperty('--c', cvar(themeId)); b.appendChild(d); }
-    b.appendChild(document.createTextNode(label));
-    if (count != null) b.appendChild(el('span', {'class': 'n'}, count));
-    b.addEventListener('click', function(){ setTheme(themeId && state.theme !== themeId ? themeId : null); });
-    b._theme = themeId; chips.appendChild(b); return b;
-  }
-  var allChip = chip('すべて', null, null);
-  themeIds.forEach(function(id){ chip(tName[id], items.filter(function(p){ return p.theme === id; }).length, id); });
-  var kwChip = el('button', {'class': 'chip', 'type': 'button', 'aria-pressed': 'true', 'hidden': ''});
-  kwChip.addEventListener('click', function(){ setView('overview'); });
-  chips.appendChild(kwChip);
+  // ---------- よく出たキーワード ----------
+  var kwWrap = document.getElementById('kwchips');
+  mapKws.forEach(function(k){
+    var b = el('button', {'class': 'chip', 'type': 'button'}, k);
+    b.appendChild(el('span', {'class': 'n'}, kwItems[k].length));
+    b.addEventListener('click', function(){ setKeyword(k); });
+    kwWrap.appendChild(b);
+  });
+  if (!mapKws.length) document.getElementById('kw-head').hidden = true;
   var unreadBtn = document.getElementById('unread');
   unreadBtn.addEventListener('click', function(){ state.unread = !state.unread; apply(); });
 
@@ -1347,29 +1355,9 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   function apply(){
     var v = state.view, ov = v === 'overview', ex = v === 'ex';
     document.body.className = 'v-' + v.split(':')[0] + (v.indexOf(':') > 0 ? ' leaf' : '');
-    allChip.setAttribute('aria-pressed', String(!state.theme && !state.keyword));
-    Array.prototype.forEach.call(chips.children, function(c){ if (c._theme) c.setAttribute('aria-pressed', String(state.theme === c._theme)); });
-    kwChip.hidden = !state.keyword;
-    if (state.keyword) kwChip.textContent = '「' + state.keyword + '」で絞り込み中　解除';
     unreadBtn.setAttribute('aria-pressed', String(state.unread));
     kwBtns.forEach(function(b){ b.classList.toggle('on', b._k === state.keyword); });
-
-    Object.keys(mapEls.kw).forEach(function(k){
-      var m = mapEls.kw[k];
-      if (m.fb) { m.fb.classList.toggle('on', k === state.keyword); return; }
-      m.g.classList.toggle('on', k === state.keyword);
-      var dim = (state.keyword && k !== state.keyword) || (state.theme && m.themes.indexOf(state.theme) < 0);
-      m.g.classList.toggle('dim', !!dim);
-    });
-    Object.keys(mapEls.theme).forEach(function(id){
-      var kw = state.keyword && mapEls.kw[state.keyword];
-      var dim = (state.theme && id !== state.theme) || (kw && kw.themes && kw.themes.indexOf(id) < 0);
-      mapEls.theme[id].classList.toggle('dim', !!dim);
-    });
-    mapEls.links.forEach(function(l){
-      var dim = (state.theme && l.theme !== state.theme) || (state.keyword && l.kw !== state.keyword);
-      l.el.classList.toggle('dim', !!dim);
-    });
+    if (ov && mapDetail.firstChild) { var cur = topicStats.filter(function(t){ return tmEls[t.id] && tmEls[t.id].classList.contains('on'); })[0]; if (cur) showTopic(cur); }
 
     var shown = 0;
     items.forEach(function(p){
