@@ -66,7 +66,9 @@ a{color:inherit}
 h1,h2,h3{text-wrap:balance}
 .date{font-size:14px;color:var(--ink3);margin:0}
 h1{font-size:30px;line-height:1.3;font-weight:700;margin:2px 0 14px;letter-spacing:.02em}
-.lede{font-size:18px;line-height:1.85;margin:0 0 18px;max-width:36em}
+.lede-box{margin:4px 0 20px;padding:18px 20px;border-radius:14px;background:var(--paper);border:1px solid var(--line);border-left:5px solid var(--t0);box-shadow:0 1px 0 var(--line)}
+.lede-label{margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:.08em;color:var(--t0)}
+.lede{font-size:19px;font-weight:500;line-height:1.85;margin:0;max-width:38em}
 .meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--ink2);margin:0 0 18px}
 .meta b{font-weight:500;color:var(--ink);font-size:16px;margin-right:2px;font-variant-numeric:tabular-nums}
 .sample{font-size:13px;color:var(--ink2);border:1px dashed var(--line);padding:6px 10px;border-radius:6px;margin:0 0 20px}
@@ -107,13 +109,6 @@ h1{font-size:30px;line-height:1.3;font-weight:700;margin:2px 0 14px;letter-spaci
 .chip[aria-pressed="true"] .n{color:inherit;opacity:.75}
 .chip.src{border-radius:6px;font-size:13px}
 .toggle{margin-left:auto}
-.pile-wrap{margin-top:14px}
-.pile-grid{display:flex;flex-wrap:wrap;gap:5px}
-.sq{position:relative;width:22px;height:22px;border-radius:5px;border:2px solid var(--c);background:var(--c);padding:0;cursor:pointer;transition:opacity .2s,background-color .2s}
-.sq.read{background:transparent}
-.sq.dim{opacity:.16}
-.sq.gap{margin-left:9px}
-.sq.has-art::after{content:"";position:absolute;right:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--ink);border:2px solid var(--paper)}
 section{margin-top:44px}
 h2{font-size:21px;font-weight:700;margin:0 0 6px;line-height:1.4}
 .sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -296,18 +291,7 @@ body:not(.v-overview) .group:first-child,body:not(.v-overview) .company:first-ch
 .mx .pt circle{fill:var(--c);stroke:var(--paper);stroke-width:2}
 .mx .pt text{fill:var(--paper);font-size:11px;font-weight:700;pointer-events:none}
 .mx .pt.on circle{stroke:var(--ink);stroke-width:3}
-details.excl{margin-top:44px;border-top:1px solid var(--line);padding-top:14px}
-body.v-ex details.excl{margin-top:0;border-top:0;padding-top:0}
-details.excl summary{cursor:pointer;font-size:15px;font-weight:500}
-details.excl summary span{color:var(--ink3);font-weight:400;font-size:13px;margin-left:6px}
-.excl ul{list-style:none;margin:10px 0 0;padding:0;font-size:14px}
-.excl li{display:grid;grid-template-columns:5.5em minmax(0,1fr) 3.5em;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
-.excl li small{color:var(--ink3);font-size:12px}
-.excl .p{font-family:var(--mono);font-size:12px;text-align:right;color:var(--ink3)}
-.excl a{overflow-wrap:anywhere}
 @media (prefers-reduced-motion:no-preference){
-  .sq{animation:drop .42s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(var(--i)*18ms)}
-  @keyframes drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
   .ba-bar{transition:transform .9s cubic-bezier(.2,.8,.3,1)}
   .viz.wait .ba-bar{transform:scaleX(0)}
   .ba-box.after,.ba-arrow{transition:opacity .5s .35s,transform .5s .35s}
@@ -329,7 +313,7 @@ details.excl summary span{color:var(--ink3);font-weight:400;font-size:13px;margi
 footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 [hidden]{display:none!important}
 @media (max-width:640px){.cols{grid-template-columns:minmax(0,1fr)}}
-@media (max-width:480px){main{padding:24px 16px 48px}.topbar{margin:-24px -16px 14px;padding:10px 16px}h1{font-size:26px}.lede{font-size:17px}.toggle{margin-left:0}.vs{grid-template-columns:1fr}.vs-mid{justify-self:center}.ba-t{grid-template-columns:1fr}.ba-arrow{justify-self:center;transform:rotate(90deg)}.excl li{grid-template-columns:minmax(0,1fr) 3.5em}.excl li small{grid-column:1/-1}}
+@media (max-width:480px){main{padding:24px 16px 48px}.topbar{margin:-24px -16px 14px;padding:10px 16px}h1{font-size:26px}.lede{font-size:17px}.lede-box{padding:14px 16px}.toggle{margin-left:0}.vs{grid-template-columns:1fr}.vs-mid{justify-self:center}.ba-t{grid-template-columns:1fr}.ba-arrow{justify-self:center;transform:rotate(90deg)}}
 </style>
 
 <div class="layout">
@@ -361,7 +345,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     <header>
       <p class="date" id="date"></p>
       <h1>ブックマーク日報</h1>
-      <p class="lede" id="lede"></p>
+      <div class="lede-box"><p class="lede-label">今日のまとめ</p><p class="lede" id="lede"></p></div>
       <p class="meta" id="meta"></p>
       <p class="sample" id="sample" hidden>これはサンプルデータです。ルーチンが毎朝この内容を差し替えます。</p>
       <ul class="status" id="status" aria-label="情報源ごとの取得状況"></ul>
@@ -374,10 +358,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       <div class="map-detail" id="map-detail" aria-live="polite"></div>
       <p class="card-sub" id="kw-head">よく出たキーワード</p>
       <div class="chips" id="kwchips" role="group" aria-label="キーワードで絞り込み"></div>
-      <div class="pile-wrap">
-        <div class="pile-grid" id="pile" aria-label="項目ごとの既読状況"></div>
-        <p class="note">1マスが1件です。塗りつぶしは未読、枠だけは既読。右上に点があるマスは記事付きの投稿です。マスを押すとその項目に移動します。</p>
-      </div>
     </div>
 
     <section id="picks-sec">
@@ -417,11 +397,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
   <p class="empty" id="empty" hidden>この条件に当てはまる項目はありません。</p>
 
-  <details class="excl" id="excl">
-    <summary>除外した項目<span id="excl-n"></span></summary>
-    <p class="note">Jevのテック判定で「テック系ではない」とした項目です。誤判定がないか確かめるために残しています。数字はテック系である確率です。</p>
-    <ul id="excl-list"></ul>
-  </details>
 
   <footer id="footer"></footer>
 </main>
@@ -627,7 +602,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   });
 
   // ---------- 絞り込みの状態 ----------
-  // view: overview（概要）/ bm・bm:<トピック> / blog・blog:<企業> / tr・tr:<情報源> / filter（マップから絞り込み）/ ex（除外）
+  // view: overview（概要）/ bm・bm:<トピック> / blog・blog:<企業> / tr・tr:<情報源> / filter（マップから絞り込み）
   var state = { view: 'overview', theme: null, keyword: null, unread: false };
 
   var kwItems = {};
@@ -729,22 +704,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var unreadBtn = document.getElementById('unread');
   unreadBtn.addEventListener('click', function(){ state.unread = !state.unread; apply(); });
 
-  // ---------- 既読の一覧（マス） ----------
-  var ordered = [];
-  SRC_ORDER.forEach(function(s){
-    themeIds.forEach(function(id){ items.forEach(function(p){ if (p._src === s && p.theme === id) ordered.push(p); }); });
-    items.forEach(function(p){ if (p._src === s && themeIds.indexOf(p.theme) < 0) ordered.push(p); });
-  });
-  var pile = document.getElementById('pile'), squares = {}, prevSrc = null;
-  ordered.forEach(function(p, i){
-    var b = el('button', {'class': 'sq', 'type': 'button', 'aria-label': SRC[p._src] + '・' + (tName[p.theme] || '') + '：' + p.title});
-    if (prevSrc !== null && prevSrc !== p._src) b.classList.add('gap');
-    if (p._src === 'bookmarks' && p.article) b.classList.add('has-art');
-    prevSrc = p._src;
-    b.style.setProperty('--c', cvar(p.theme)); b.style.setProperty('--i', Math.min(i, 40));
-    b.addEventListener('click', function(){ goTo(p.id); });
-    pile.appendChild(b); squares[p.id] = b;
-  });
 
   // ---------- まず読む3件 ----------
   var picks = document.getElementById('picks');
@@ -1276,18 +1235,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     });
   }
 
-  // ---------- 除外した項目 ----------
-  var ex = D.excluded || [], exList = document.getElementById('excl-list');
-  document.getElementById('excl-n').textContent = ex.length + '件';
-  if (!ex.length) document.getElementById('excl').hidden = true;
-  var EX_SRC = {bookmarks: 'ブックマーク', qiita: 'Qiita', zenn: 'Zenn'};
-  ex.forEach(function(x){
-    var li = el('li');
-    li.appendChild(el('small', null, EX_SRC[x.source] || x.source));
-    li.appendChild(safeUrl(x.url) ? link(x.url, x.title) : el('span', null, x.title));
-    li.appendChild(el('span', {'class': 'p'}, num(x.tech_prob) ? x.tech_prob.toFixed(2) : '—'));
-    exList.appendChild(li);
-  });
 
   // ---------- カテゴリ（サイドバー） ----------
   var TREND_SRC = ['github', 'qiita', 'zenn', 'devio'];
@@ -1308,7 +1255,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   companies2.forEach(function(c){ NAV.push({view: 'blog:' + c.company, label: c.label || c.company, status: c.status}); });
   NAV.push({view: 'tr', label: 'トレンド', top: true, grp: true});
   TREND_SRC.forEach(function(s){ var st = statusBy[s]; if (items.some(function(p){ return p._src === s; }) || st) NAV.push({view: 'tr:' + s, label: SRC[s], status: st && st.status}); });
-  if ((D.excluded || []).length) NAV.push({view: 'ex', label: '除外した項目', top: true, grp: true});
   var VIEW_LABEL = {}, VIEW_PARENT = {}, navEl = document.getElementById('nav'), parentView = null;
   NAV.forEach(function(n){
     VIEW_LABEL[n.view] = n.label;
@@ -1326,7 +1272,6 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       n.btn.setAttribute('aria-current', state.view === n.view ? 'page' : 'false');
       n.cnt.textContent = ''; n.cnt.className = 'cnt';
       if (n.view === 'overview') return;
-      if (n.view === 'ex') { n.cnt.textContent = String((D.excluded || []).length); return; }
       var list = items.filter(function(p){ return inView(p, n.view); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       if (!list.length) { n.cnt.textContent = n.status === 'error' ? '取得失敗' : '更新なし'; if (n.status === 'error') n.cnt.classList.add('err'); return; }
       if (!unread) { n.cnt.textContent = '✓ ' + list.length; n.cnt.classList.add('done'); return; }
@@ -1353,7 +1298,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
   // ---------- 表示の反映 ----------
   function apply(){
-    var v = state.view, ov = v === 'overview', ex = v === 'ex';
+    var v = state.view, ov = v === 'overview';
     document.body.className = 'v-' + v.split(':')[0] + (v.indexOf(':') > 0 ? ' leaf' : '');
     unreadBtn.setAttribute('aria-pressed', String(state.unread));
     kwBtns.forEach(function(b){ b.classList.toggle('on', b._k === state.keyword); });
@@ -1361,13 +1306,12 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
     var shown = 0;
     items.forEach(function(p){
-      var isRead = !!read[p.id], sq = squares[p.id], pe = itemEls[p.id];
-      if (sq) sq.classList.toggle('read', isRead);
+      var isRead = !!read[p.id], pe = itemEls[p.id];
       if (pe) {
         pe.classList.toggle('is-read', isRead);
         pe._rb.setAttribute('aria-pressed', String(isRead));
         pe._rb.textContent = isRead ? '既読' : '既読にする';
-        var vis = !ov && !ex && inView(p, v) && !(state.unread && isRead);
+        var vis = !ov && inView(p, v) && !(state.unread && isRead);
         pe.hidden = !vis; if (vis) shown++;
       }
     });
@@ -1384,8 +1328,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       sec.classList.toggle('solo', v !== 'filter');
     });
     document.getElementById('ov').hidden = !ov;
-    var exEl = document.getElementById('excl'); exEl.hidden = !ex || !(D.excluded || []).length; if (ex) exEl.open = true;
-    document.getElementById('empty').hidden = ov || ex || shown > 0;
+    document.getElementById('empty').hidden = ov || shown > 0;
 
     var head = document.getElementById('view-head');
     head.hidden = ov;
@@ -1399,7 +1342,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       crumb.appendChild(cb);
     }
     var vm = document.getElementById('view-meta'); vm.textContent = '';
-    if (!ov && !ex) {
+    if (!ov) {
       var list = items.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       vm.appendChild(document.createTextNode(list.length + '件（未読 ' + unread + '件）'));
       if (v === 'filter') { var cl = el('button', {'type': 'button', 'class': 'clear'}, '絞り込みを解除'); cl.addEventListener('click', function(){ setView('overview'); }); vm.appendChild(cl); }
