@@ -1,7 +1,7 @@
 # x-bookmark-digest
 
 毎朝、Xのブックマークと、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）、主要5社の公式テックブログの更新を集め、
-図解つきの要約レポートとして claude.ai のアーティファクトに届ける個人用システムのテンプレート。設計は [docs/spec.md](docs/spec.md)。
+図解つきの要約レポートとして claude.ai のアーティファクトに届ける個人用システムのテンプレート。仕様は [docs/spec.md](docs/spec.md)。
 
 | 層 | どこで動くか | すること |
 | --- | --- | --- |
@@ -72,6 +72,9 @@ gh variable set DIGEST_ENABLED --body true
 gh workflow run fetch
 ```
 
+`upstream`（テンプレート）を remote に足していると、`gh` がどちらのリポジトリを操作するか決められずに止まる。
+その場合は先に `gh repo set-default MY-NAME/x-bookmark-digest` を実行する（または各コマンドに `-R MY-NAME/x-bookmark-digest` を付ける）。
+
 `DIGEST_ENABLED` が `true` でないと、ワークフローは何もしない（テンプレート自身や設定途中のリポジトリで失敗し続けないため）。
 実行が終わったら `git pull` して、`data/` にその日のファイルが入ったことを確かめる。
 
@@ -98,6 +101,7 @@ claude.ai/code/routines で次のように作り、「今すぐ実行」で1回�
 
 ```bash
 git remote add upstream https://github.com/NaokiKomura/x-bookmark-digest-template.git
+gh repo set-default MY-NAME/x-bookmark-digest   # remote が2つになるので、gh の操作先を自分のリポジトリに固定する
 git fetch upstream
 git merge upstream/main --allow-unrelated-histories   # 2回目からは --allow-unrelated-histories は不要
 ```
@@ -118,19 +122,6 @@ docs/               設計（architecture）、データの形（data）、命�
 
 `claude/reports` ブランチに `reports/YYYY-MM-DD.html` と `summaries/<article_key>.json` が溜まる。
 
-## 仕様書との違い
-
-| 項目 | 実装 | 理由 |
-| --- | --- | --- |
-| Qiita | 人気記事の Atom フィード（`/popular-items/feed`） | トレンドページはログイン画面に転送される |
-| Zenn | トレンド順の非公式 JSON（`/api/articles?order=daily`） | トレンドの RSS がない |
-| DevelopersIO | `/trending/`（週間トレンド） | 人気ランキングのページがこれ |
-| X Engineering Blog | 一覧ページの差分 | RSS がない。2023年以降の更新はほぼない |
-| 公式ブログの新着 | RSS は公開日が3日以内の記事だけ。RSS のない一覧ページは初回は既読にするだけ | 初回に過去の記事が一度に新着扱いになるのを防ぐ |
-| Jev の問い | 英語で書く | Jev の精度が最も高い言語 |
-| 判定の呼び出し | テック判定とトピック分類を1回の呼び出しで並列に尋ねる | 呼び出し回数が半分になる。除外になった項目のトピックは使わない |
-| ブックマークの除外 | `data/YYYY-MM-DD.json` には `tech_label: excluded` として残し、`data/excluded/` にも記録する | 推移グラフの件数を新着の総数にするため |
-
 ## 開発
 
 コーディングエージェント（Claude Code など）で改造する前提で整えている。入口は [AGENTS.md](AGENTS.md)。
@@ -144,11 +135,30 @@ make preview   # サンプルデータ入りのレポートをブラウザで開
 
 よくある変更（ページ構造が変わった、ブログを足す、Jev の問いを変える、表示を変える）の手順は [docs/recipes.md](docs/recipes.md)。
 
+## 費用の試算
+
+1か月（30日）あたりの目安。前提は、新着ブックマークが1日20件以下、追加の情報源が1日約60件（GitHub 10、Qiita・Zenn・DevelopersIO 各10、公式ブログ約5、補充の数件）。
+単価は 2026-10-03 時点の公開情報、トークン数は同日の実測。
+
+| 項目 | 計算 | 月額の目安 |
+| --- | --- | --- |
+| X API（ブックマーク） | 自分のデータの読み取り（Owned Read）$0.001/件。返した件数ぶん課金されるので、1日1ページ20件 = $0.02/日 | **約$0.6** |
+| X API（展開したデータ） | 引用元の投稿（Post read $0.005/件）と投稿者（User read $0.010/件）が別に数えられる場合の上限。1日に投稿者20人・引用元3件として約$0.22/日。同じ UTC 日の重複は1回だけ課金 | 0〜約$7 |
+| TypeSafe AI（Jev） | 入力 $0.042/100万トークン（出力は無料）。テック判定つき約4,200トークン/回、トピックのみ約1,900トークン/回 × 約70回/日 ≒ 20万トークン/日 ≒ 600万トークン/月 | **約$0.25** |
+| Claude | ルーチン1回/日。API キーは使わずサブスクの利用枠内（Pro はルーチンの実行が1日5回まで。利用枠は通常の会話と共通） | 追加なし（Pro 以上の契約が前提） |
+| GitHub Actions | 取得ワークフロー約2〜3分/日 ≒ 90分/月 + CI。プライベートリポジトリの無料枠は Free プランで2,000分/月（超えると Linux $0.006/分） | $0 |
+| GitHub のストレージ | 記事本文が約1MB/日（実測: 64件で約1MB）増える。1年で約0.35GB（git の圧縮前） | $0（リポジトリの推奨上限 数GB の範囲） |
+
+合計は **月 約$1〜$8**（ほぼ X API の展開データが課金されるかどうかで決まる）と Claude のサブスク料金。
+X API の初回の支払い登録で $20 分のクレジットが付く。実際の金額は、運用開始から数日後に X の Developer Console の利用状況で確かめる。
+
+参考: [X API Pricing](https://docs.x.com/x-api/getting-started/pricing)、[TypeSafe Models](https://docs.typesafe.ai/models)、[Introducing routines in Claude Code](https://claude.com/blog/introducing-routines-in-claude-code)、[GitHub Actions の課金](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
+
 ## 1日あたりの外部への呼び出し
 
 | 相手 | 回数の目安 |
 | --- | --- |
-| X API | トークン更新1回 + ブックマーク取得1〜5回（50件ずつ。取得済みの投稿に当たったら止める） |
+| X API | トークン更新1回 + ブックマーク取得1回（20件ずつ。取得済みの投稿に当たったら止める。新着が20件を超える日だけ2回以上） |
 | 各サイト | 一覧ページ・フィード各1回（10か所）、robots.txt はホストごとに1回、本文は未取得の記事だけ（約50〜70件） |
 | GitHub API | README 10回（Trending が読めない日は Search API 1回） |
 | TypeSafe AI（Jev） | 1項目1回（約70回） |

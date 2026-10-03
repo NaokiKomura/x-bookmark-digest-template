@@ -70,6 +70,6 @@ ROUTINE.md               ルーチンのプロンプト本体
 7. **約束をそろえる。** data/ の形は `scripts/lib/models.py` と `docs/data.md`、report-data の形は `ROUTINE.md` と `validate_data` とテンプレート。片方だけ変えない。
 8. **これは公開テンプレート。** 個人のデータ、URL、ID を入れない（`config/report.json` の `artifact_url` は空のまま）。
 9. **小さく変える。** 1回の変更は1つの目的にする。大きな変更は先に手順を箇条書きにして見せる。
-10. **外部への呼び出し回数が増える変更**は、README の「1日あたりの外部への呼び出し」を更新する。仕様書と違う実装にしたら README の「仕様書との違い」を更新する。
+10. **外部への呼び出し回数や費用が変わる変更**は、README の「費用の試算」と「1日あたりの外部への呼び出し」を更新する。振る舞いを変えたら仕様書（docs/spec.md）も同じ変更で直す。
 
 命名とコードの書き方は [docs/conventions.md](docs/conventions.md)。

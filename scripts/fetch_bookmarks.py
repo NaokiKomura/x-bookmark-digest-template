@@ -40,8 +40,9 @@ from scripts.lib.store import (
 from scripts.lib.urls import clean_url, domain_of, is_article_url, url_key
 
 BOOKMARKS_URL = "https://api.x.com/2/users/{user_id}/bookmarks"
-PAGE_SIZE = 50
-MAX_PAGES = 5
+PAGE_SIZE = 20
+"""1ページの件数。X API は返した件数ぶん課金される（取得済みの投稿も含む）ので大きくしない。"""
+MAX_PAGES = 10
 """1回の実行で読むページの上限。取得済みの投稿に当たれば、そこで止める。"""
 MAX_SEEN_IDS = 20_000
 PARAMS = {

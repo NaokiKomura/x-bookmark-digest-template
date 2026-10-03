@@ -1,6 +1,6 @@
 # Xブックマーク要約システム 仕様書
 
-> このリポジトリの元になった仕様書。実装で変えた点（Qiita・Zenn の取得方法など）は README の「仕様書との違い」にある。
+> このリポジトリの仕様書。実装に合わせて更新している（初版 2026-10-03）。データの形の詳細は [data.md](data.md)、設計の理由は [architecture.md](architecture.md)。
 
 Oct 3, 2026 · @古村直輝
 
@@ -48,13 +48,13 @@ X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ル
 毎朝、取得（GitHub Actions）から要約（ルーチン）まで次の順に一方向で流れる。各段階の出力は次の段階の入力としてリポジトリに残る。
 
 1. **トークン更新（6:00）**：SecretsのリフレッシュトークンでX APIのアクセストークンを取得する。新しいリフレッシュトークンは、後続処理より先に `gh secret set` でSecretsへ書き戻す。
-2. **ブックマーク取得**：ブックマークAPIをページ送りで呼び、引用元の投稿とリンクの情報も展開して受け取る。`state/seen_ids.json` と照合して新着だけを残す。
+2. **ブックマーク取得**：ブックマークAPIを1ページ20件でページ送りし、引用元の投稿とリンクの情報も展開して受け取る。`state/seen_ids.json` にある投稿に当たったら止め、新着だけを残す（X APIは返した件数ぶん課金されるため、ページを大きくしない）。
 3. **追加の情報源の取得**：GitHubトレンドの上位10リポジトリ、Qiita・Zenn・DevelopersIOのランキング上位、公式テックブログの新着を取得する（詳細は「追加の情報源」）。
 4. **本文の取得**：ブックマークのリンク先記事、ランキング記事、ブログ記事の本文と、リポジトリのREADMEを取得して `data/articles/` に保存する。
 5. **Jevで判定**：ブックマークとQiita・Zennの記事はテック系かどうかを判定し、非テックを除外する。残ったすべての項目をトピックに分類する（詳細は「Jevによる判定」）。
-6. **保存とコミット**：結果を `data/YYYY-MM-DD.json`（ブックマーク）と `data/sources/YYYY-MM-DD.json`（追加の情報源）に書き出し、`state/` を更新してmainにコミットする。新着が0件でも空のファイルを置く。
+6. **保存とコミット**：ワークフローはリポジトリ変数 `DIGEST_ENABLED` が `true` のときだけ動く。結果を `data/YYYY-MM-DD.json`（ブックマーク）と `data/sources/YYYY-MM-DD.json`（追加の情報源）に書き出し、`state/` を更新してmainにコミットする。新着が0件でも空のファイルを置く。
 7. **要約（7:00）**：ルーチンがmainをクローンし、当日のデータと本文を読んで、要点、図解、キーワードを作る。トピックはJevの分類結果をそのまま使う。
-8. **レポート生成**：テンプレートHTMLの `report-data` ブロックだけを差し替え、既存のアーティファクトに公開し直す。同じHTMLを `reports/YYYY-MM-DD.html` として `claude/reports` ブランチにもpushする。
+8. **レポート生成**：テンプレートHTMLの `report-data` ブロックだけを差し替え、`config/report.json` の `artifact_url` のアーティファクトに公開し直す（空なら新しく作り、URLを報告する）。同じHTMLを `reports/YYYY-MM-DD.html` として `claude/reports` ブランチにもpushする。
 
 推移グラフ用の件数は、ルーチンが `data/` 配下の日別ファイルの件数を数えて作る。
 
@@ -108,7 +108,7 @@ X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ル
 
 ## Jevによる判定
 
-すべての項目の振り分けをJevに任せ、Claudeは要約だけを行う。Jevは文章を生成せず、あらかじめ決めた選択肢から確率付きで答えを返す判定専用のモデルで、入力100万トークンあたり約0.042ドル、出力は無料と安価なため、全件にかけても費用はほぼかからない（[LLM Reference](https://www.llmreference.com/model/jev/typesafe-ai)）。
+すべての項目の振り分けをJevに任せ、Claudeは要約だけを行う。Jevは文章を生成せず、あらかじめ決めた選択肢から確率付きで答えを返す判定専用のモデルで、入力100万トークンあたり約0.042ドル、出力は無料と安価なため、全件にかけても費用はほぼかからない（[TypeSafe Models](https://docs.typesafe.ai/models)。費用の試算は README）。
 
 ### 判定の種類
 
@@ -119,11 +119,15 @@ X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ル
 
 GitHubトレンド、DevelopersIO、公式テックブログはもともとテック系なので、テック判定を省きトピック分類だけを行う。
 
+テック判定とトピック分類は同じ入力に対する独立した問いなので、1回の呼び出しで並列に尋ねる（除外になった項目のトピックは使わない）。問いの文面、しきい値、入力の文字数は `config/jev.json` に置き、問いは英語で書く（Jevの精度が最も高い言語）。
+
 ### Jevに渡す入力
 
 - ブックマーク：投稿本文、引用元の本文、リンク先記事のタイトルと本文の先頭4,000文字
 - 記事・ブログ：タイトルと本文の先頭4,000文字
 - リポジトリ：リポジトリ名、説明文、READMEの先頭4,000文字
+
+ブックマークのリンク先記事は2本まで渡す。記事を取得できなかった場合は、Xのカード情報（タイトル・概要）を代わりに渡す。
 
 APIの呼び出し形式（エンドポイント、問いの書き方）はTypeSafe AIのドキュメントに従う。本書では問いと選択肢だけを定義する。
 
@@ -150,8 +154,8 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 ### 判定結果の扱い
 
 - **保留**：要約時にClaudeが内容を読み、テック系かどうかを最終判断する。
-- **除外**：`data/excluded/YYYY-MM-DD.json` に確率と一緒に記録する。レポート末尾に「除外した項目」として件数と見出しを折りたたんで表示し、誤判定を確認できるようにする。
-- **ランキング記事の補充**：除外でQiita・Zennの件数が10件を割った場合は、ランキングの次点から補充する。
+- **除外**：`data/excluded/YYYY-MM-DD.json` に確率と一緒に記録する。ブックマークは日別ファイルにも `tech_label: excluded` の印を付けて残す（推移グラフの件数を新着の総数にするため）。レポート末尾に「除外した項目」として件数と見出しを折りたたんで表示し、誤判定を確認できるようにする。
+- **ランキング記事の補充**：除外でQiita・Zennの件数が10件を割った場合は、ランキングの次点から補充する。次点（各10件）は取得時に `reserve` として取っておき、補充のときに本文を取得する。
 - **Jevが応答しない場合**：判定結果を空にして保存し、Claudeが代わりにテック判定とトピック分類を行う。Jevはearly access中でSLAがないため、この代替経路を必ず用意する。
 
 ## 追加の情報源
@@ -163,9 +167,9 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 | 情報源 | 取得件数 | 取得方法 | 公式API・RSS | 要約に使う本文 |
 | --- | --- | --- | --- | --- |
 | GitHubトレンド | その日にスターが増えた上位10リポジトリ | Trendingページ（日次）を取得。失敗時はSearch APIで直近に作成されたリポジトリをスター数順に取得 | なし（ページを取得） | 説明文とREADMEの先頭（GitHub APIで取得） |
-| Qiita | トレンド上位10件 | トレンドページを取得 | なし（非公式） | 記事本文 |
-| Zenn | トレンド上位10件 | トレンドのRSSを取得 | RSSあり | 記事本文 |
-| DevelopersIO | 人気記事上位10件 | 人気ランキングページを取得 | なし（ページを取得） | 記事本文 |
+| Qiita | トレンド上位10件 | 人気記事のAtomフィード（`/popular-items/feed`）。トレンドページはログイン画面に転送されるため使わない | フィードあり | 記事本文 |
+| Zenn | トレンド上位10件 | トレンド順の記事一覧JSON（`/api/articles?order=daily`）。トレンドのRSSはない | なし（非公式のJSON） | 記事本文 |
+| DevelopersIO | 週間トレンド上位10件 | トレンドページ（`/trending/`）を取得 | なし（ページを取得） | 記事本文 |
 | 公式テックブログ | 前回以降の新着すべて | RSSがあればRSS、なければ一覧ページの差分 | ブログにより異なる | 記事本文 |
 
 取得するURLとページの読み取り方は `config/sources.json` に定義する。ページ構造が変わったときはこのファイルとスクリプトだけを直せば済むようにする。
@@ -180,11 +184,22 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 | AWS | AWS News Blog |
 | X | X Engineering Blog |
 
-各ブログのRSSの有無と取得URLは、実装時に確認して `config/sources.json` に登録する。
+各ブログの取得方法（2026-10-03 に確認。`config/sources.json` に登録済み）:
+
+| ブログ | 取得方法 | URL |
+| --- | --- | --- |
+| Anthropic News | 一覧ページの差分（RSSなし） | https://www.anthropic.com/news |
+| Anthropic Engineering | 一覧ページの差分（RSSなし） | https://www.anthropic.com/engineering |
+| OpenAI News | RSS | https://openai.com/news/rss.xml |
+| Google Developers Blog | RSS | https://developers.googleblog.com/rss/ |
+| Google Research Blog | RSS | https://research.google/blog/rss/ |
+| AWS News Blog | RSS | https://aws.amazon.com/blogs/aws/feed/ |
+| X Engineering Blog | 一覧ページの差分（RSSなし）。2023年以降の更新はほぼない | https://blog.x.com/engineering/en_us |
 
 ### 更新の判定
 
 - 公式テックブログは、`state/seen_urls.json` にない記事だけを新着として扱う。新着がない日は、レポートで「更新なし」と表示する。
+- 初回に過去の記事が一度に新着扱いにならないよう、RSSは公開日が3日以内の記事だけを新着とし（1ブログ10件まで）、RSSのない一覧ページは初回は既読として記録するだけにする。
 - ランキング系（GitHub、Qiita、Zenn、DevelopersIO）は毎日その日の上位を取得する。前日にも載っていた項目は「連続◯日目」の印を付け、前日の要約を再利用する（`claude/reportsブランチの summaries/` にURL単位で保存）。
 
 ### 要約の深さ
@@ -211,27 +226,36 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 
 ```text
 .github/workflows/fetch.yml   取得と判定のワークフロー（6:00）
+.github/workflows/ci.yml      lint・型チェック・テスト
 scripts/fetch_bookmarks.py    トークン更新・ブックマーク取得・差分抽出
 scripts/fetch_sources.py      GitHubトレンド・ランキング・公式ブログの取得
 scripts/fetch_articles.py     リンク先記事・README・ブログ本文の取得と抽出
 scripts/classify_jev.py       Jevによるテック判定とトピック分類
+scripts/auth_local.py         初回のリフレッシュトークンを取得してSecretsに登録する
+scripts/report_tools.py       ルーチン用の補助（入力の確認、推移、キーワード、組み立て、検証）
+scripts/lib/                  取得層の共通部品（パスとJSON、URL、HTTP、ページの読み取り、XのOAuth、データの型）
 config/topics.json            トピック一覧（固定）
 config/sources.json           追加の情報源の取得URLと読み取り方
+config/jev.json               Jevの問いとしきい値
+config/report.json            ルーチンが上書きするアーティファクトのURL
 state/seen_ids.json           取得済みの投稿ID
-state/seen_urls.json          取得済みのブログ記事URL
+state/seen_urls.json          取得済みのブログ記事URL（ブログごと）
 data/YYYY-MM-DD.json          日別の新着ブックマーク
 data/sources/YYYY-MM-DD.json  日別の追加の情報源
 data/excluded/YYYY-MM-DD.json テック判定で除外した項目
 data/articles/<key>.json      記事・README・ブログの本文（URLのハッシュ単位）
 summaries/<key>.json          要約のキャッシュ（claude/reportsブランチ）
-template/report.html          レポートのテンプレート
+template/report.html          レポートのテンプレート（サンプルデータ入り）
 ROUTINE.md                    ルーチンの手順書（プロンプト本体）
 reports/YYYY-MM-DD.html       過去のレポート（claude/reportsブランチ）
+AGENTS.md, docs/              コーディングエージェント向けの案内、設計・データ・命名規則・変更手順
 ```
+
+`<key>`（article_key）は、計測用のクエリを外したURLのSHA-256の先頭12桁。
 
 ### 日別の投稿データ（data/YYYY-MM-DD.json）
 
-投稿1件の形式。引用やリンクがない場合、`quoted` は `null`、`links` は空配列にする。
+ファイルは `{"date": "YYYY-MM-DD", "fetched_at": ..., "posts": [...]}`。X APIの取得に失敗した日は `error` が付く。`posts` の1件の形式は次のとおり。引用やリンクがない場合、`quoted` は `null`、`links` は空配列にする。
 
 ```json
 {
@@ -253,7 +277,7 @@ reports/YYYY-MM-DD.html       過去のレポート（claude/reportsブランチ
       "domain": "example.com",
       "card_title": "Xのカードに出ているタイトル",
       "card_description": "Xのカードに出ている概要",
-      "article_key": "3f9a1c0e",
+      "article_key": "3f9a1c0e5b2d",
       "from": "quoted"
     }
   ],
@@ -273,7 +297,7 @@ reports/YYYY-MM-DD.html       過去のレポート（claude/reportsブランチ
 
 ```json
 {
-  "key": "3f9a1c0e",
+  "key": "3f9a1c0e5b2d",
   "url": "https://example.com/post/agent-tools",
   "domain": "example.com",
   "title": "記事タイトル",
@@ -346,10 +370,11 @@ Qiita、Zenn、DevelopersIOの1件は `kind: "article"` で、`likes`（いい�
 | github | 配列 | GitHubトレンドの要約。順位、スター増加数、言語、1〜2行の説明、トピック |
 | articles | 配列 | Qiita・Zenn・DevelopersIOの要約。サイト、順位、1〜2行の要点、トピック |
 | blogs | 配列 | 公式テックブログの新着の要約。企業、ブログ名、見出し、要点、図解 |
-| source\_status | 配列 | 情報源ごとの取得結果（成功、更新なし、取得失敗） |
-| excluded | 配列 | テック判定で除外した項目の見出しと確率 |
+| source\_status | 配列 | 情報源ごとの取得結果。`source` は `bookmarks`、`blogs`、`github`、`qiita`、`zenn`、`devio`、`status` は `ok`（新着あり）、`none`（更新なし）、`error`（取得失敗） |
+| blog\_companies | 配列 | 公式ブログの企業ごとの取得結果（新着がない企業に「更新なし」と出すため） |
+| excluded | 配列 | テック判定で除外した項目の見出しと確率。`source` は `bookmarks`、`qiita`、`zenn` |
 
-投稿ごとの項目は次のとおり。記事・引用に関する4項目（kind、article、quoted、comment）が今回の追加分。
+投稿ごとの項目は次のとおり。各項目の詳しい形は ROUTINE.md の手順5、検証は `scripts/report_tools.py validate`。
 
 | キー | 必須 | 内容 |
 | --- | --- | --- |
@@ -393,8 +418,10 @@ X APIの認証情報はGitHub Secretsにだけ保管し、リフレッシュト�
 
 GitHub APIの呼び出し（READMEの取得、Search APIでの代替取得）には、ワークフローに標準で付く `GITHUB_TOKEN` を使い、追加のSecretは作らない。
 
+Secretsのほかに、リポジトリ変数 `DIGEST_ENABLED`（`true` で取得ワークフローが動く）を使う。テンプレート自身や設定途中のリポジトリで定期実行が失敗し続けないようにするため。
+
 - OAuthのスコープは `tweet.read`、`users.read`、`bookmark.read`、`offline.access` の4つ。
-- 初回のリフレッシュトークンは、ローカルで認証フローを1回実行して取得し、手動でSecretsに登録する。
+- 初回のリフレッシュトークンは、ローカルで認証フロー（`scripts/auth_local.py`）を1回実行して取得し、画面に出さずにそのままSecretsに登録する。
 - アクセストークン（有効期限 約2時間）は実行中のメモリにだけ置き、ファイルやログに出力しない。
 - 書き戻しに失敗したら、そのまま後続処理を止める（古いトークンのまま進むと、次回以降の実行がすべて失敗するため）。
 - ルーチン側のクラウド環境には、X関連の値を環境変数としてもAPI credentialsとしても登録しない。
@@ -500,22 +527,10 @@ GitHub APIの呼び出し（READMEの取得、Search APIでの代替取得）に
 | 利用枠の上限 | ルーチンが実行されない | 要約の深さを下げるか、実行時刻を作業しない時間帯にずらす。モデルがSonnetか確認する |
 | X APIの仕様変更 | 取得結果が空、またはエラー | 取得スクリプトのパラメータを見直す |
 
-## 実装タスク
+## 導入と運用開始
 
-取得層から順に作り、各段階を手動実行で確かめてから自動化する。
+実装は完了している。導入の手順（リポジトリの作成、Secrets、初回の認証、ルーチンの作成）は README の「セットアップ」にある。
+運用開始後に行うこと:
 
-- [ ] プライベートリポジトリを作成し、上記の構成でフォルダを用意する
-- [ ] ローカルでOAuth認証を1回実行し、初回のリフレッシュトークンを取得する
-- [ ] GitHub SecretsにX関連の値、TYPESAFE\_API\_KEY、GH\_PATを登録する
-- [ ] TypeSafe AIのドキュメントでJevの呼び出し形式を確認し、テック判定とトピック分類の問いを作る
-- [ ] 過去のブックマーク数十件でJevの判定を試し、しきい値（0.7と0.4）を調整する
-- [ ] 各公式テックブログのRSSの有無と取得URLを確認し、`config/sources.json` に登録する
-- [ ] `fetch_bookmarks.py`：トークン更新、書き戻し、取得、差分抽出を実装する
-- [ ] `fetch_sources.py`：GitHubトレンド、Qiita・Zenn・DevelopersIOのランキング、公式ブログの取得を実装する
-- [ ] `fetch_articles.py`：URLの展開、robots.txtの確認、本文・READMEの抽出、キャッシュを実装する
-- [ ] `classify_jev.py`：テック判定、トピック分類、除外の記録、Jev障害時の空保存を実装する
-- [ ] `fetch.yml`：6:00のcronと手動実行に対応したワークフローを作る
-- [ ] テンプレートに記事・引用ポスト、公式ブログ、トレンド、除外一覧の表示を追加する
-- [ ] `ROUTINE.md`：ルーチンの手順と守るべき指示を書く
-- [ ] ルーチンを作成し、「今すぐ実行」で1回試す
-- [ ] 1週間、取得ログ、除外一覧、ルーチンの実行ログ、利用枠の消費を確認する
+- 自分のブックマーク数十件でJevの判定を確かめ、必要ならしきい値（0.7と0.4）を `config/jev.json` で調整する
+- 1週間、取得ログ、除外一覧、ルーチンの実行ログ、利用枠とX APIの利用額を確認する
