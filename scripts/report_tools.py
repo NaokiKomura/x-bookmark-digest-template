@@ -238,6 +238,11 @@ def validate_data(data: Any) -> list[str]:
     for section in ("github", "articles", "blogs"):
         for item in data[section]:
             check_item(section, item)
+    for b in data["blogs"]:
+        need(
+            b.get("fetch_status") in FETCH_STATUSES,
+            f"blogs {b.get('id')}: fetch_status が不明",
+        )
     for a in data["articles"]:
         need(a.get("site") in ("qiita", "zenn", "devio"), f"articles {a.get('id')}: site が不明")
     for s in data["source_status"]:

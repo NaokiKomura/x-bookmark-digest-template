@@ -84,7 +84,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | picks | 「まず読む3件」の項目ID。全情報源から、重要度とほかの項目とのつながりで選ぶ |
 | trend | `python3 scripts/report_tools.py trend "$DAY"` の出力をそのまま使う |
 | posts | ブックマークの要約（下の表） |
-| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "visual"?}` |
+| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（ok 以外なら画面に印が出る） |
 | blog_companies | 企業ごとの状況。`{"company", "label", "status": "ok"/"none"/"error", "count"}`。`blog_status` を企業単位にまとめる（どれか1つでも新着があれば ok、全ブログが error なら error、それ以外は none） |
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |

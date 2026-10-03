@@ -357,11 +357,11 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   {"id": "b1", "company": "anthropic", "company_label": "Anthropic", "blog": "Engineering", "theme": "llm_agents",
    "title": "（サンプル）長時間動くエージェントのための足場の設計", "url": "https://www.anthropic.com/engineering",
    "points": ["進捗の記録と再開の手順を最初に決めておく", "評価は小さく始めて失敗例を足していく"],
-   "keywords": ["長時間タスク", "評価"], "importance": 3, "read_min": 9,
+   "keywords": ["長時間タスク", "評価"], "importance": 3, "read_min": 9, "fetch_status": "ok",
    "visual": {"type": "flow", "steps": ["計画を書き出す", "1機能ずつ実装", "進捗を記録", "次のセッションで再開"]}},
   {"id": "b2", "company": "google", "company_label": "Google", "blog": "Google Developers Blog", "theme": "cloud_infra",
    "title": "（サンプル）マネージド実行環境で関数のコールドスタートを短くする", "url": "https://developers.googleblog.com/",
-   "points": ["最小インスタンス数を1にすると初回の遅れが消える"], "keywords": ["コールドスタート"], "importance": 1, "read_min": 5}
+   "points": ["最小インスタンス数を1にすると初回の遅れが消える"], "keywords": ["コールドスタート"], "importance": 1, "read_min": 5, "fetch_status": "error"}
  ],
  "github": [
   {"id": "g1", "rank": 1, "title": "example/agent-harness", "url": "https://github.com/trending", "language": "TypeScript", "stars_today": 1240, "stars_total": 18300, "theme": "llm_agents", "streak_days": 2,
@@ -811,6 +811,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       var kws = keywordsEl(p); if (kws) a.appendChild(kws);
       var f = el('div', {'class': 'foot'});
       if (p.importance >= 3) f.appendChild(el('span', {'class': 'must'}, '必読'));
+      if (FETCH_FLAG[p.fetch_status]) f.appendChild(el('span', {'class': 'flag'}, FETCH_FLAG[p.fetch_status]));
       if (p.read_min) f.appendChild(el('span', null, '約' + p.read_min + '分'));
       if (safeUrl(p.url)) f.appendChild(link(p.url, '記事を開く'));
       var rb = readButton(p); f.appendChild(rb); a.appendChild(f);
