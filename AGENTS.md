@@ -15,19 +15,50 @@ GitHub Actions 6:00 JST（取得層: scripts/*.py）            Claude ルーチ
 
 両層のやり取りは main の data/ のファイルだけ。外部と通信するのは取得層だけ。詳しくは [docs/architecture.md](docs/architecture.md)。
 
-## 初回セットアップ（集める情報源を選ぶ）
+## 初回セットアップ（情報源・取得ワークフロー・ルーチン）
 
-`config/enabled.json` がないときは、ほかの作業の前に、どの情報源を集めるかを利用者に尋ねる。
-X のブックマークは常に集めるので尋ねない。選ばれなかった情報源には取得層が接続しない。
+`config/enabled.json` がないときは、ほかの作業の前に次の3つを利用者に尋ねる。どれも利用者が決めることなので、
+エージェントが勝手に選んだり、外部の設定（Actions の有効化、ルーチンの作成、push）を先に進めたりしない。
 
-1. `uv run python -m scripts.configure_sources --list` で選択肢を出す（グループごとの `id`・`label`・`note`）。
-2. グループごとに **複数選択** の設問を1つずつ出す（トレンド、公式テックブログ）。選択肢には `label` を、説明には `note`（公式ブログのブログ名）を使う。
-   Claude Code では AskUserQuestion を `multiSelect: true` で使い、1回の呼び出しに2問を入れる（1問4択まで。超えるグループは2問に分ける）。
-   ほかのエージェントでは、番号付きの一覧を示して複数の番号で答えてもらう。
-3. 選ばれた `id` をカンマ区切りで `uv run python -m scripts.configure_sources --enable <ids>` に渡す（何も選ばれなければ `--enable ""`）。
-4. `make check` を通し、`config/enabled.json` をコミットする。push は利用者に確認してから行う。
+| 設問 | 形式 | 選択肢 |
+| --- | --- | --- |
+| 集めるトレンド | 複数選択 | `configure_sources --list` の `trends` グループ |
+| 集める公式テックブログ | 複数選択 | 同じく `blogs` グループ（企業単位） |
+| 取得ワークフロー（GitHub Actions、毎朝6:00） | 1つ選ぶ | 有効にして今すぐ1回試す／有効にするだけ（翌朝6:00から）／あとで自分で設定する |
+| 要約のルーチン（Claude、毎朝7:00） | 1つ選ぶ | 今作る（毎日7:00）／あとで自分で作る（「その他」で時刻を指定できる） |
 
-選び直したいと言われたときも同じ手順で行う。
+Claude Code では AskUserQuestion の1回の呼び出しにこの4問を入れる（情報源の2問は `multiSelect: true`。1問4択まで。
+選択肢が5つ以上のグループは2問に分け、その分 Actions・ルーチンの設問は次の呼び出しに回す）。
+ほかのエージェントでは、番号付きの一覧を示して番号で答えてもらう。X のブックマークは常に集めるので尋ねない。
+
+### 1. 情報源
+
+1. `uv run python -m scripts.configure_sources --list` で選択肢を出す（グループごとの `id`・`label`・`note`）。選択肢には `label`、説明には `note` を使う。
+2. 選ばれた `id` をカンマ区切りで `uv run python -m scripts.configure_sources --enable <ids>` に渡す（何も選ばれなければ `--enable ""`）。
+3. `make check` を通し、`config/enabled.json` をコミットする。選ばれなかった情報源には取得層が接続しない。
+
+### 2. 取得ワークフロー（「あとで」なら何もしない）
+
+1. 有効にする前に `config/enabled.json` を push する（push してよいか確認する。push しないと、ワークフローはすべての情報源を集める）。
+2. 必要な Secrets がそろっているか、名前だけを確かめる：`gh secret list -R <自分のリポジトリ>`。
+   必要なのは `X_CLIENT_ID`、`X_CLIENT_SECRET`、`X_USER_ID`、`X_REFRESH_TOKEN`、`TYPESAFE_API_KEY`、`GH_PAT`。
+   足りなければ有効にせず、足りない名前と README のセットアップ手順2・3を示して止まる（値は利用者が登録する。エージェントは秘密情報を扱わない）。
+3. `gh variable set DIGEST_ENABLED --body true -R <自分のリポジトリ>`。
+4. 「今すぐ試す」なら `gh workflow run fetch -R <自分のリポジトリ>` を実行し、`gh run watch` で終わりを待って結果を伝え、`git pull` で `data/` に当日のファイルが入ったことを確かめる。
+
+`gh` には必ず `-R` を付ける（remote が2つあるとテンプレートを操作してしまうことがある）。
+
+### 3. 要約のルーチン（「あとで」なら何もしない）
+
+以下の Claude 用設定でルーチンを作らない。Cloud の定期起動を設定できない場合は、その未設定項目を報告する。
+
+- Claude Code では schedule スキル（`/schedule`）でルーチンを作る。設定は README のセットアップ手順5の表のとおり（毎日7:00、モデル Sonnet、コネクタなし、プロンプトは表の文面）。
+  利用者が時刻を指定したらその時刻にする。取得ワークフローは6:00に始まり数分かかる（遅れることもある）ので、6:30より前を指定されたら、その旨を伝えて確かめる。
+- ルーチンを作れないエージェントでは作らず、README の手順5を示して、claude.ai/code/routines で作ってもらう。
+- 作ったら「今すぐ実行」で1回試すかを尋ねる。
+
+最後に、選ばれた内容と、「あとで」にした項目の残りの手順（README の該当箇所）を短くまとめて伝える。
+選び直したいと言われたときも同じ手順で行う（情報源だけ、ワークフローだけ、と一部だけでもよい）。
 
 ## コマンド
 
@@ -45,7 +76,7 @@ uv run pytest tests/test_parsers.py -k devio     # テストを絞る
 | やりたいこと | 触るファイル | 手順 |
 | --- | --- | --- |
 | サイトのページ構造が変わって「取得失敗」になった | `config/sources.json` のセレクタ、`scripts/lib/parsers.py`、`tests/fixtures/sources/` | [recipes](docs/recipes.md#ページ構造が変わった) |
-| 集める情報源を選び直す | `uv run python -m scripts.configure_sources --enable ...`（`config/enabled.json`） | [初回セットアップ](#初回セットアップ集める情報源を選ぶ) |
+| 集める情報源を選び直す | `uv run python -m scripts.configure_sources --enable ...`（`config/enabled.json`） | [初回セットアップ](#初回セットアップ情報源取得ワークフロールーチン) |
 | 公式ブログや情報源を足す・外す | `config/sources.json`（ブログはここだけで済む） | [recipes](docs/recipes.md#公式ブログを足す) |
 | Jev の問い・しきい値を変える | `config/jev.json` | [recipes](docs/recipes.md#jev-の問いやしきい値を変える) |
 | トピックを変える | `config/topics.json` と `template/report.html` の `TOPICS` | [recipes](docs/recipes.md#トピックを変える) |

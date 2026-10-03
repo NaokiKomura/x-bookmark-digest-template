@@ -38,7 +38,7 @@ git push origin "$(git commit-tree "$(git hash-object -t tree /dev/null)" -m 'in
 
 ### 1.5. 集める情報源を選ぶ
 
-X のブックマークに加えて、どのトレンドと公式ブログを集めるかを選ぶ。Claude Code などのコーディングエージェントでこのリポジトリを開くと、最初に複数選択の設問が出る（[AGENTS.md](AGENTS.md#初回セットアップ集める情報源を選ぶ)）。手で選ぶときは次のとおり。
+X のブックマークに加えて、どのトレンドと公式ブログを集めるかを選ぶ。Claude Code などのコーディングエージェントでこのリポジトリを開くと、最初に設問が出る（[AGENTS.md](AGENTS.md#初回セットアップ情報源取得ワークフロールーチン)）。集める情報源のほか、取得ワークフロー（手順4）を有効にするか、要約のルーチン（手順5）を作るかも尋ねられ、選んだものはエージェントが設定する。「あとで」を選んだ手順は下の説明のとおり自分で行う。手で情報源を選ぶときは次のとおり。
 
 ```bash
 uv run python -m scripts.configure_sources --list                       # 選択肢
@@ -169,10 +169,11 @@ make preview   # サンプルデータ入りのレポートをブラウザで開
 | X API（展開したデータ） | 引用元の投稿（Post read $0.005/件）と投稿者（User read $0.010/件）が別に数えられる場合の上限。1日に投稿者20人・引用元3件として約$0.22/日。同じ UTC 日の重複は1回だけ課金 | 0〜約$7 |
 | TypeSafe AI（Jev） | 入力 $0.042/100万トークン（出力は無料）。テック判定つき約4,200トークン/回、トピックのみ約1,900トークン/回 × 約70回/日 ≒ 20万トークン/日 ≒ 600万トークン/月 | **約$0.25** |
 | Claude | 要約ルーチン1回/日 + 担当者による検証・公開。API キーは使わずサブスクの利用枠内（Pro はルーチンの実行が1日5回まで。利用枠は通常の会話と共通） | 追加なし（Pro 以上の契約が前提） |
-| GitHub Actions | 取得ワークフロー約2〜3分/日 ≒ 90分/月 + CI。プライベートリポジトリの無料枠は Free プランで2,000分/月（超えると Linux $0.006/分） | $0 |
+| GitHub Actions | 取得ワークフローは実測1〜1.6分/回（ブックマーク3件で66秒、30件と本文約120件で98秒）。ジョブごとに分単位で切り上げて数えるので2分/日 ≒ 60分/月。CI は約20秒/回で1分/push。合わせて月100〜200分程度で、プライベートリポジトリの無料枠（Free プランで2,000分/月、Pro は3,000分/月）の1割未満。超えると Linux $0.006/分 | $0 |
 | GitHub のストレージ | 記事本文が約1MB/日（実測: 64件で約1MB）増える。1年で約0.35GB（git の圧縮前） | $0（リポジトリの推奨上限 数GB の範囲） |
 
 合計は **月 約$1〜$8**（ほぼ X API の展開データが課金されるかどうかで決まる）と Claude のサブスク料金。
+GitHub は無料枠に収まる想定で、追加の費用はかからない（Actions は月100〜200分程度で、Free プランの無料枠2,000分/月の1割未満。ほかに Actions を使うワークフローがない前提。使用量は GitHub の Settings → Billing で確かめられる）。
 X API の初回の支払い登録で $20 分のクレジットが付く。実際の金額は、運用開始から数日後に X の Developer Console の利用状況で確かめる。
 
 参考: [X API Pricing](https://docs.x.com/x-api/getting-started/pricing)、[TypeSafe Models](https://docs.typesafe.ai/models)、[Introducing routines in Claude Code](https://claude.com/blog/introducing-routines-in-claude-code)、[GitHub Actions の課金](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
