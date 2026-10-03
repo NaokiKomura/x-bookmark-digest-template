@@ -78,6 +78,21 @@ def test_run_replaces_page_titles(digest_root):
     assert out["devio"][0]["title"] == "記事タイトル"
 
 
+def test_run_limits_links_per_post(digest_root):
+    links = [{"url": f"https://example.com/ok{i}", "article_key": f"a{i}"} for i in range(8)]
+    bookmarks = {"date": "2026-10-03", "posts": [{"id": "1", "links": links}]}
+    (digest_root / "data" / "2026-10-03.json").write_text(json.dumps(bookmarks))
+    with client(
+        {
+            "/robots.txt": httpx.Response(404),
+            "/ok": httpx.Response(200, html=fixture_text("articles/long.html")),
+        }
+    ) as http:
+        assert fa.run(http) == {"ok": fa.MAX_LINKS_PER_POST}
+    saved = sorted(p.stem for p in (digest_root / "data" / "articles").glob("*.json"))
+    assert saved == [f"a{i}" for i in range(fa.MAX_LINKS_PER_POST)]
+
+
 def test_strip_site_suffix():
     assert fa.strip_site_suffix("判断特化型AIを試した | DevelopersIO") == "判断特化型AIを試した"
     assert fa.strip_site_suffix("A | B | DevelopersIO") == "A | B"

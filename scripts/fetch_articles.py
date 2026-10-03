@@ -9,6 +9,7 @@
 3. robots.txt で禁止されているサイトは取得しない（fetch_status: blocked）。
 4. 通信待ち10秒、robots.txtと本文を合わせた総時間30秒、上限2MBで取得し、trafilatura でタイトル、サイト名、公開日、本文を取り出す。
 5. 本文は先頭から最大20,000文字で保存する。500文字未満なら partial。
+6. ブックマークは1投稿あたり先頭の MAX_LINKS_PER_POST 本だけ取る（まとめ投稿で数十本のリンクがあるため）。
 取得エラーは error として記録し、翌日以降も再取得しない。
 """
 
@@ -45,6 +46,8 @@ from scripts.lib.web import FetchError, RobotsChecker, fetch_bytes, fetch_deadli
 
 MAX_ARTICLE_CHARS = 20_000
 PARTIAL_CHARS = 500
+MAX_LINKS_PER_POST = 5
+"""Jev の判定には先頭2本、レポートには主な1本を使う。残りは取らない。"""
 GITHUB_API = "https://api.github.com"
 
 
@@ -166,7 +169,7 @@ def run(http: httpx.Client) -> dict[str, int]:
     bookmarks: BookmarksFile | None = read_json(bookmarks_path(day), None)
     if bookmarks:
         for post in bookmarks["posts"]:
-            for link in post["links"]:
+            for link in post["links"][:MAX_LINKS_PER_POST]:
                 tally(fetch_article(http, robots, link["article_key"], link["url"]))
 
     spath = sources_path(day)
