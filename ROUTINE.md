@@ -143,7 +143,9 @@ python3 scripts/report_tools.py validate /tmp/report.html
 
 ### 8. 公開と保存
 
-1. アーティファクトを公開する: `config/report.json` の `artifact_url` が空でなければ、Artifact ツールで `url` にその URL、`file_path` に `/tmp/report.html` を渡して publish する（同じ URL が上書きされる）。
+1. アーティファクトを公開する: `config/report.json` の `artifact_url` が空でなければ、
+   1. 先に Artifact ツールで `action: "read"`、`url` にその URL を渡して、公開中の版を読む（読んでいない版には上書きできない仕組みのため）。中身は前日までのレポートなので、今日の内容に取り込まない
+   2. Artifact ツールで `url` にその URL、`file_path` に `/tmp/report.html` を渡して publish する（同じ URL が上書きされる）。「新しい版がある」と断られたら、その版を読んだうえで `/tmp/report.html` をそのまま公開し直してよい（日報は毎日まるごと差し替えるもので、閲覧者がページに保存する内容はない）
    空なら `url` を渡さずに publish して新しく作り、最後の報告に「`config/report.json` の `artifact_url` に次の URL を書いて main にコミットしてください: <URL>」と書く（このルーチンは main に push しない）。
 2. `claude/reports` ブランチに保存して push する:
 
