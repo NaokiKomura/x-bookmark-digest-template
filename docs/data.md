@@ -63,12 +63,14 @@
 | --- | --- |
 | `github` | `RepoItem` の配列（上位10件）。`stars_today` は Search API で代用した日は `null` |
 | `qiita`、`zenn`、`devio` | `RankingItem` の配列（各10件）。Qiita・Zenn の `jev` はテック判定つき、DevelopersIO はトピックだけ |
-| `blogs` | `BlogItem` の配列（前回以降の新着） |
+| `blogs` | `BlogItem` の配列（前回以降の新着）。`summary` は RSS の概要（最大500文字。一覧ページのブログは空） |
 | `status` | 情報源ごとの取得結果（`github`、`qiita`、`zenn`、`devio`、`blogs`） |
 | `blog_status` | ブログごとの結果（`new` / `none` / `error` と件数） |
 | `notes` | 補足（例: `github` を Search API で代用した旨） |
 | `errors` | 失敗した情報源と理由 |
 | `reserve` | Qiita・Zenn の次点。`classify_jev.py` が補充に使って消す（ルーチンからは見えない） |
+
+Qiita の項目と公式ブログの項目は、フィードの概要を `summary` に持つ（Zenn・DevelopersIO・一覧ページのブログは空）。本文が取れなかった記事（サイトがボットからの取得を拒否する場合など）は、Jev の判定とルーチンの要約でこれを本文の代わりに使う。
 
 `streak_days` は前日のファイルにも同じ URL があれば前日の値 + 1。2以上なら、ルーチンは前日の要約を再利用する。
 `title_source: "page"` は一覧ページから拾った見出し（崩れやすい）で、記事のタイトルが取れたら `fetch_articles.py` が置き換えて `"article"` にする。

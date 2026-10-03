@@ -170,6 +170,7 @@ def to_ranking_item(parsed: ParsedEntry, rank: int, prev: dict[str, int]) -> Ran
         "url": url,
         "published": iso_or_none(parsed.get("published")),
         "likes": parsed.get("likes"),
+        "summary": parsed.get("summary", ""),
         "article_key": url_key(url),
         "streak_days": prev.get(url, 0) + 1,
         "jev": None,
@@ -200,6 +201,7 @@ def to_blog_item(parsed: ParsedEntry, blog: dict[str, Any]) -> BlogItem:
         "title": parsed["title"],
         "url": url,
         "published": iso_or_none(parsed.get("published")),
+        "summary": parsed.get("summary", ""),
         "article_key": url_key(url),
         "jev": None,
     }

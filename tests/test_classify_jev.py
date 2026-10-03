@@ -182,6 +182,13 @@ def test_bookmark_state_falls_back_to_card():
     assert art == {"title": "c", "body": "d"}
 
 
+def test_article_state_falls_back_to_feed_summary():
+    item = {"title": "T", "summary": "フィードの概要"}
+    assert cj.article_state(item, None, "OpenAI News", CONF)["item"]["body"] == "フィードの概要"
+    record = {"text": "本文"}
+    assert cj.article_state(item, record, "OpenAI News", CONF)["item"]["body"] == "本文"
+
+
 def test_questions_build_with_sdk():
     from typesafe_sdk import Choice, Noul
 

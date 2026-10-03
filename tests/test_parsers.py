@@ -33,6 +33,11 @@ def test_rss_drops_non_https_and_converts_to_jst():
     assert items[0]["published"] == date(2026, 10, 3)
 
 
+def test_rss_keeps_description_as_summary():
+    items = parsers.feed(fixture_bytes("sources/openai_news.rss"))
+    assert items[0]["summary"] == "Startups can choose models & tune effort."
+
+
 def test_atom():
     assert (
         parsers.feed(fixture_bytes("sources/qiita_popular.atom"))[0]["url"]

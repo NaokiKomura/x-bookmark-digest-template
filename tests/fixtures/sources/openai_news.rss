@@ -1,5 +1,5 @@
 <?xml version="1.0"?><rss><channel>
-<item><title>New &amp; shiny</title><link>https://openai.com/index/a</link><pubDate>Fri, 02 Oct 2026 18:00:00 GMT</pubDate></item>
+<item><title>New &amp; shiny</title><link>https://openai.com/index/a</link><description><![CDATA[<p>Startups can choose models &amp; tune effort.</p>]]></description><pubDate>Fri, 02 Oct 2026 18:00:00 GMT</pubDate></item>
 <item><title>Old</title><link>https://openai.com/index/b</link><pubDate>Mon, 01 Jun 2026 18:00:00 GMT</pubDate></item>
 <item><title>Bad</title><link>javascript:alert(1)</link></item>
 </channel></rss>

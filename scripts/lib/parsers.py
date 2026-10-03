@@ -24,6 +24,7 @@ from scripts.lib.urls import clean_url, plain_text
 ATOM = "{http://www.w3.org/2005/Atom}"
 REPO_PATH = re.compile(r"^/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/?$")
 MAX_TITLE = 200
+MAX_SUMMARY = 500
 
 
 class ParseError(RuntimeError):
@@ -45,6 +46,8 @@ class ParsedEntry(TypedDict, total=False):
     published: date | None
     likes: int
     title_source: str
+    summary: str
+    """フィードの概要（RSS の description、Atom の summary）。本文が取れないときの代わりに使う。"""
 
 
 def to_int(text: str | None) -> int | None:
@@ -122,6 +125,10 @@ def feed(body: bytes) -> list[ParsedEntry]:
             items.append(
                 {
                     "title": plain_text(text(entry.find(f"{ATOM}title")), MAX_TITLE),
+                    "summary": plain_text(
+                        text(entry.find(f"{ATOM}summary")) or text(entry.find(f"{ATOM}content")),
+                        MAX_SUMMARY,
+                    ),
                     "url": link or "",
                     "published": to_date(
                         text(entry.find(f"{ATOM}published")) or text(entry.find(f"{ATOM}updated"))
@@ -135,6 +142,7 @@ def feed(body: bytes) -> list[ParsedEntry]:
                     "title": plain_text(text(item.find("title")), MAX_TITLE),
                     "url": (text(item.find("link")) or "").strip(),
                     "published": to_date(text(item.find("pubDate"))),
+                    "summary": plain_text(text(item.find("description")), MAX_SUMMARY),
                 }
             )
     return [i for i in items if i["url"].startswith("https://") and i["title"]]

@@ -53,6 +53,7 @@ def test_collect_records_failures_and_streaks(digest_root):
     assert out["status"]["devio"] == "error"
     assert any(e["source"] == "devio" for e in out["errors"])
     assert [b["title"] for b in out["blogs"]] == ["New & shiny"]
+    assert out["blogs"][0]["summary"] == "Startups can choose models & tune effort."
     statuses = {f"{b['company']}/{b['blog']}": b["status"] for b in out["blog_status"]}
     assert statuses["openai/News"] == "new" and statuses["aws/AWS News Blog"] == "error"
     seen = json.loads((digest_root / "state" / "seen_urls.json").read_text())["urls"]

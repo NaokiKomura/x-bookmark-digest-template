@@ -48,6 +48,7 @@ git fetch origin claude/reports
   `error` があればブックマークの取得に失敗している（`source_status` を `error` にする）。
 - `data/sources/$DAY.json` の `github`、`qiita`、`zenn`、`devio`、`blogs`、`status`、`blog_status`、`notes`、`errors`。
 - 本文は `data/articles/<article_key>.json`（`text`、`title`、`fetch_status`、`chars`）。
+  公式ブログと Qiita で `fetch_status` が `ok` 以外（サイトが取得を拒否した記事など）は、項目の `summary`（フィードの概要）とタイトルだけを材料にする。概要に書かれていないことを補って書かない。外部のサイトを取りに行かない。
 - `data/excluded/$DAY.json` の `items`。
 
 ### 3. 前日の要約を探す（ランキングの連続項目）

@@ -131,6 +131,8 @@ class RankingItem(TypedDict):
     url: str
     published: str | None
     likes: int | None
+    summary: str
+    """フィードの概要（Qiita のみ。ほかは空）。本文が取れないときの代わり。"""
     article_key: str
     streak_days: int
     """前日にも載っていれば前日の値 + 1。"""
@@ -148,6 +150,8 @@ class BlogItem(TypedDict):
     title: str
     url: str
     published: str | None
+    summary: str
+    """RSS の概要（最大500文字）。一覧ページのブログは空。本文が取れない記事（fetch_status が ok 以外）の要約に使う。"""
     article_key: str
     jev: TopicJev | None
     title_source: NotRequired[Literal["page", "article"]]

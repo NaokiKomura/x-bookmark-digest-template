@@ -27,6 +27,7 @@ from typing import Any, Literal, Protocol, cast
 from scripts.lib import actions
 from scripts.lib.models import (
     ArticleRecord,
+    BlogItem,
     BookmarksFile,
     ExcludedFile,
     ExcludedItem,
@@ -131,14 +132,12 @@ def bookmark_state(
 
 
 def article_state(
-    title: str, record: ArticleRecord | None, site: str, conf: dict[str, Any]
+    item: RankingItem | BlogItem, record: ArticleRecord | None, site: str, conf: dict[str, Any]
 ) -> State:
+    """記事・ブログ: タイトルと本文の先頭。本文が取れていなければフィードの概要（summary）を使う。"""
+    body = (record and record["text"]) or item.get("summary", "")
     return {
-        "item": {
-            "type": f"article on {site}",
-            "title": title,
-            "body": clip(record and record["text"], conf),
-        }
+        "item": {"type": f"article on {site}", "title": item["title"], "body": clip(body, conf)}
     }
 
 
@@ -288,7 +287,7 @@ def classify_ranking(
             fetch_reserve_article(item)
         if not judged(item["jev"]):
             item["jev"] = clf.tech(
-                article_state(item["title"], load_article(item["article_key"]), site, conf)
+                article_state(item, load_article(item["article_key"]), site, conf)
             )
         jev = cast(TechJev, item["jev"])  # Qiita・Zenn の jev は常にテック判定つき
         if jev["tech_label"] == "excluded":
@@ -314,15 +313,13 @@ def classify_topic_only(sources: SourcesFile, clf: Classifier, conf: dict[str, A
     for item in sources.get("devio", []):
         if not judged(item["jev"]):
             item["jev"] = clf.topic(
-                article_state(
-                    item["title"], load_article(item["article_key"]), "DevelopersIO", conf
-                )
+                article_state(item, load_article(item["article_key"]), "DevelopersIO", conf)
             )
     for blog in sources.get("blogs", []):
         if not judged(blog["jev"]):
             site = f"{blog['company_label']} {blog['blog']}"
             blog["jev"] = clf.topic(
-                article_state(blog["title"], load_article(blog["article_key"]), site, conf)
+                article_state(blog, load_article(blog["article_key"]), site, conf)
             )
 
 
