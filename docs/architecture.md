@@ -4,7 +4,7 @@
 
 | 層 | 実行場所 | 外部との通信 | 秘密情報 | 書くもの |
 | --- | --- | --- | --- | --- |
-| 取得層 | GitHub Actions（`.github/workflows/fetch.yml`、5:00 JST） | X API、各サイト、GitHub API、TypeSafe AI | X・TypeSafe・GH_PAT（Secrets） | main の `data/`、`state/` |
+| 取得層 | GitHub Actions（`.github/workflows/fetch.yml`、5:00 JST） | X API、各サイト、GitHub API、TypeSafe AI（キーがあるときだけ） | X・TypeSafe・GH_PAT（Secrets） | main の `data/`、`state/` |
 | 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | なし（入力を読み取り専用で渡す） | なし | ローカルのreport-dataと要約キャッシュ |
 | 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | Git・Artifactのみ | 公開先だけの権限 | Claude: 固定アーティファクトと `claude/reports`。Codex: `codex/reports` |
 | 表示層 | Claude のアーティファクト、または Codex の結果チャット・HTMLファイル | cdnjs の d3 だけ | なし | 閲覧者のブラウザの localStorage（既読） |

@@ -6,14 +6,14 @@ Oct 3, 2026 · @古村直輝
 
 ## 概要
 
-毎朝、Xのブックマークに加えて、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）と主要4社の公式テックブログの更新を自動で集め、図解つきの要約レポートとして、Claudeならclaude.aiのアーティファクト、CodexならCodex Cloudの結果チャットに届ける。テック系かどうかの判定とトピックの分類はTypeSafe AIの判定モデルJevで行い、要約だけをClaudeまたはCodexに任せる。
+毎朝、Xのブックマークに加えて、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）と主要4社の公式テックブログの更新を自動で集め、図解つきの要約レポートとして、Claudeならclaude.aiのアーティファクト、CodexならCodex Cloudの結果チャットに届ける。テック系かどうかの判定とトピックの分類はTypeSafe AIの判定モデルJevで行い、要約だけをClaudeまたはCodexに任せる。Jevは任意で、APIキーがなければ判定と分類も要約担当が行う。
 
 前提条件は次のとおり。
 
 | 項目 | 内容 |
 | --- | --- |
 | X API | 登録済みの開発者アプリ。OAuth 2.0（PKCE）のユーザーコンテキストで利用する |
-| TypeSafe AI | 発行済みのAPIキー。判定モデルJevでテック判定とトピック分類を行う |
+| TypeSafe AI（任意） | 発行済みのAPIキー。判定モデルJevでテック判定とトピック分類を行う。なければ要約担当が判定する |
 | 要約担当 | Claude Codeのルーチンを使えるプラン、またはCodex Cloudを利用できるアカウントと公開済み環境 |
 | GitHub | プライベートリポジトリ1つ。GitHub Actionsで取得と判定を動かす |
 | 情報源 | Xのブックマーク、GitHubトレンド、Qiita・Zenn・DevelopersIOのランキング、Anthropic・OpenAI・Google・AWSの公式テックブログ |
@@ -169,6 +169,7 @@ APIの呼び出し形式（エンドポイント、問いの書き方）はTypeS
 - **除外**：`data/excluded/YYYY-MM-DD.json` に確率と一緒に記録する。ブックマークは日別ファイルにも `tech_label: excluded` の印を付けて残す（推移グラフの件数を新着の総数にするため）。誤判定は `data/excluded/` のファイルで確認する（レポートには表示しない）。
 - **ランキング記事の補充**：除外でQiita・Zennの件数が10件を割った場合は、ランキングの次点から補充する。次点（各10件）は取得時に `reserve` として取っておき、補充のときに本文を取得する。
 - **Jevが応答しない場合**：判定結果を空にして保存し、Claudeが代わりにテック判定とトピック分類を行う。Jevはearly access中でSLAがないため、この代替経路を必ず用意する。
+- **Jevを使わない場合**：`TYPESAFE_API_KEY` が登録されていなければJevを呼ばず、全項目を応答しない場合と同じ扱い（`status: unavailable`）で保存する。判定と分類はすべて要約担当が行う。取得時の除外がないので、ランキング記事の補充も行わない。
 
 ## 追加の情報源
 
@@ -439,7 +440,7 @@ X APIの認証情報はGitHub Secretsにだけ保管し、リフレッシュト�
 | X\_CLIENT\_SECRET | Xアプリのクライアントシークレット | 変更時のみ |
 | X\_REFRESH\_TOKEN | 最新のリフレッシュトークン | 毎回の実行で書き戻す |
 | X\_USER\_ID | 自分のXユーザーID | 変更時のみ |
-| TYPESAFE\_API\_KEY | TypeSafe AI（Jev）のAPIキー | 変更時のみ |
+| TYPESAFE\_API\_KEY | TypeSafe AI（Jev）のAPIキー（任意。なければJevを使わない） | 変更時のみ |
 | GH\_PAT | このリポジトリのSecretsだけを書き込める細かい権限のPAT | 有効期限の前に更新 |
 
 GitHub APIの呼び出し（READMEの取得、Search APIでの代替取得）には、ワークフローに標準で付く `GITHUB_TOKEN` を使い、追加のSecretは作らない。
@@ -554,7 +555,7 @@ Codexの要約にかかる利用枠・料金はCodex側の契約と実行方法�
 | --- | --- | --- |
 | 取得ワークフローの失敗 | GitHubからの失敗通知メール | ログを確認して再実行する。当日のレポートは「データなし」になる |
 | トークンの書き戻し失敗 | 次回実行時の認証エラー | ローカルで認証フローをやり直し、X\_REFRESH\_TOKENを再登録する |
-| Jevの障害・仕様変更 | `jev.status` が unavailable | 対応不要。Claudeが代わりに判定と分類を行う。続く場合は呼び出し部分を見直す |
+| Jevの障害・仕様変更 | `jev.status` が unavailable | 対応不要。Claudeが代わりに判定と分類を行う。キーを登録しているのに続く場合は呼び出し部分を見直す |
 | 誤判定の多発 | `data/excluded/YYYY-MM-DD.json` | テック判定のしきい値か、Jevへの問いの文面を見直す |
 | 情報源のページ構造の変更 | レポートに「取得失敗」と表示 | `config/sources.json` と取得スクリプトの読み取り部分を直す |
 | 記事の取得失敗 | `fetch_status` が error | 対応不要。レポートに「本文未取得」と表示される |

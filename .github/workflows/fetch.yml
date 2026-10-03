@@ -56,7 +56,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run python -m scripts.fetch_articles
 
-      # 5. Jev で判定（応答しなければ unavailable として保存し、ルーチンが代わりに判定する）
+      # 5. Jev で判定（キーがないか応答しなければ unavailable として保存し、ルーチンが代わりに判定する）
       - name: classify with Jev
         env:
           TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}

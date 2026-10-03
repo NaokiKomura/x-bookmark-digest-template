@@ -5,7 +5,7 @@
 ## これは何か
 
 Xのブックマークとテック系トレンド（GitHub・Qiita・Zenn・DevelopersIO）・公式テックブログを毎朝集め、
-Jev（TypeSafe AI）で振り分け、Claude または Codex が要約する個人用システムのテンプレート。
+Jev（TypeSafe AI。任意）で振り分け、Claude または Codex が要約する個人用システムのテンプレート。
 Claude は claude.ai のアーティファクト、Codex は Cloud タスクの結果チャットに届ける。
 
 ```text
@@ -52,8 +52,9 @@ Claude Code では AskUserQuestion の1回の呼び出しにこの4問を入れ�
 
 1. 有効にする前に `config/enabled.json` を push する（push してよいか確認する。push しないと、ワークフローはすべての情報源を集める）。
 2. 必要な Secrets がそろっているか、名前だけを確かめる：`gh secret list -R <自分のリポジトリ>`。
-   必要なのは `X_CLIENT_ID`、`X_CLIENT_SECRET`、`X_USER_ID`、`X_REFRESH_TOKEN`、`TYPESAFE_API_KEY`、`GH_PAT`。
+   必要なのは `X_CLIENT_ID`、`X_CLIENT_SECRET`、`X_USER_ID`、`X_REFRESH_TOKEN`、`GH_PAT`。
    足りなければ有効にせず、足りない名前と README のセットアップ手順2・3を示して止まる（値は利用者が登録する。エージェントは秘密情報を扱わない）。
+   `TYPESAFE_API_KEY` は任意。なければ止まらずに進め、「Jev を使わず、判定と分類はルーチンが行う（README の「Jevを使わない場合」）。使うならキーを登録すれば翌朝から反映される」と伝える。
 3. `gh variable set DIGEST_ENABLED --body true -R <自分のリポジトリ>`。
 4. 「今すぐ試す」なら `gh workflow run fetch -R <自分のリポジトリ>` を実行し、`gh run watch` で終わりを待って結果を伝え、`git pull` で `data/` に当日のファイルが入ったことを確かめる。
 
