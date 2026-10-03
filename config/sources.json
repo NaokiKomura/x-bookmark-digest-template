@@ -1,0 +1,91 @@
+{
+  "_note": "追加の情報源の取得URLと読み取り方。ページ構造が変わったら、このファイルと scripts/fetch_sources.py の読み取り部分だけを直す。確認日: 2026-10-03",
+  "user_agent": "x-bookmark-digest/0.1 (personal daily digest; one request per site per day)",
+  "github": {
+    "label": "GitHubトレンド",
+    "top": 10,
+    "trending": {
+      "url": "https://github.com/trending?since=daily",
+      "row": "article.Box-row",
+      "name_link": "h2 a",
+      "description": "p",
+      "language": "[itemprop=programmingLanguage]",
+      "stars_total": "a[href$='/stargazers']",
+      "stars_today": "span.d-inline-block.float-sm-right"
+    },
+    "fallback_search": {
+      "_note": "Trendingの読み取りに失敗したら、直近に作成されたリポジトリをスター数順に取る（GitHub Search API、GITHUB_TOKEN）",
+      "created_within_days": 7
+    }
+  },
+  "qiita": {
+    "label": "Qiita",
+    "top": 10,
+    "reserve": 10,
+    "kind": "feed",
+    "_note": "トレンドページ（https://qiita.com/trend）はログイン画面に転送されるため、人気記事のAtomフィード（トレンドと同じ並び）を使う",
+    "url": "https://qiita.com/popular-items/feed"
+  },
+  "zenn": {
+    "label": "Zenn",
+    "top": 10,
+    "reserve": 10,
+    "kind": "zenn_api",
+    "_note": "ZennにはトレンドのRSSがない（https://zenn.dev/feed は新着順）。トレンド順の非公式JSONを使う",
+    "url": "https://zenn.dev/api/articles?order=daily"
+  },
+  "devio": {
+    "label": "DevelopersIO",
+    "top": 10,
+    "kind": "page",
+    "_note": "人気ランキングのページ（週間トレンド）。カード内の「話題の記事」などのバッジは div.relative の中にあるので見出しから除く",
+    "url": "https://dev.classmethod.jp/trending/",
+    "link": "main a[href^='/articles/']",
+    "title_exclude": "div.relative",
+    "base_url": "https://dev.classmethod.jp"
+  },
+  "blogs": [
+    {
+      "company": "anthropic", "company_label": "Anthropic", "blog": "News", "kind": "page",
+      "_note": "RSSなし。一覧ページの差分を取る",
+      "url": "https://www.anthropic.com/news",
+      "link_pattern": "^/news/[a-z0-9-]+$",
+      "base_url": "https://www.anthropic.com"
+    },
+    {
+      "company": "anthropic", "company_label": "Anthropic", "blog": "Engineering", "kind": "page",
+      "_note": "RSSなし。一覧ページの差分を取る",
+      "url": "https://www.anthropic.com/engineering",
+      "link_pattern": "^/engineering/[a-z0-9-]+$",
+      "base_url": "https://www.anthropic.com"
+    },
+    {
+      "company": "openai", "company_label": "OpenAI", "blog": "News", "kind": "feed",
+      "url": "https://openai.com/news/rss.xml"
+    },
+    {
+      "company": "google", "company_label": "Google", "blog": "Google Developers Blog", "kind": "feed",
+      "url": "https://developers.googleblog.com/rss/"
+    },
+    {
+      "company": "google", "company_label": "Google", "blog": "Google Research Blog", "kind": "feed",
+      "url": "https://research.google/blog/rss/"
+    },
+    {
+      "company": "aws", "company_label": "AWS", "blog": "AWS News Blog", "kind": "feed",
+      "url": "https://aws.amazon.com/blogs/aws/feed/"
+    },
+    {
+      "company": "x", "company_label": "X", "blog": "X Engineering Blog", "kind": "page",
+      "_note": "RSSなし。一覧ページの差分を取る。curl では 403 になるが、httpx では取得できた（2026-10-03）。記事のURLは /topics/<分類>/<年>/<slug>。2023年以降の更新はほぼない。取れない日はレポートに「取得失敗」と出る",
+      "url": "https://blog.x.com/engineering/en_us",
+      "link_pattern": "^(https://blog\\.x\\.com)?/engineering/en_us/topics/[a-z0-9-]+/[0-9]{4}/[^/?#]+$",
+      "base_url": "https://blog.x.com"
+    }
+  ],
+  "blog_rules": {
+    "max_new_per_blog": 10,
+    "max_age_days": 3,
+    "_note": "RSSは公開日が max_age_days より古い記事を新着にしない。初回（そのブログの既読URLが空）の一覧ページは既読として記録するだけにする（過去の記事を一度に新着扱いしないため）"
+  }
+}

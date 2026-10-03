@@ -1,0 +1,987 @@
+<title>ブックマーク日報</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* 1列の読み物。上から「今日の全体像 → 絞り込み → 情報源ごとの節」。トピックの色は config/topics.json の並び順で固定 */
+:root{
+  --bg:#E6ECF1;--paper:#F7F9FB;--ink:#16212C;--ink2:#4B5967;--ink3:#6F7D8A;--line:#CAD4DD;--focus:#2C5E92;--warn:#A4471F;
+  --t0:#2B7A72;--t1:#4A57A6;--t2:#A8731A;--t3:#8C477C;--t4:#2F6FA3;--t5:#567529;--t6:#B0473A;--t7:#6B57A8;--t8:#2F8450;--t9:#8E5A2E;--t10:#AE4570;--t11:#4F6F86;--t12:#7A838C;
+  --font:"IBM Plex Sans JP","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0F151C;--paper:#17202A;--ink:#E2E8EE;--ink2:#A3B0BC;--ink3:#7F8D9A;--line:#2A3744;--focus:#8DB6E2;--warn:#E59A74;
+  --t0:#5BBFB3;--t1:#8F9BE8;--t2:#DDAA4B;--t3:#CF88BE;--t4:#72B2E6;--t5:#9CC062;--t6:#E88B7C;--t7:#AE9CEB;--t8:#6CC98E;--t9:#D3A074;--t10:#E58AAE;--t11:#93B2C8;--t12:#9AA4AE;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0F151C;--paper:#17202A;--ink:#E2E8EE;--ink2:#A3B0BC;--ink3:#7F8D9A;--line:#2A3744;--focus:#8DB6E2;--warn:#E59A74;
+  --t0:#5BBFB3;--t1:#8F9BE8;--t2:#DDAA4B;--t3:#CF88BE;--t4:#72B2E6;--t5:#9CC062;--t6:#E88B7C;--t7:#AE9CEB;--t8:#6CC98E;--t9:#D3A074;--t10:#E58AAE;--t11:#93B2C8;--t12:#9AA4AE;
+  color-scheme:dark;}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.75;-webkit-text-size-adjust:100%}
+main{max-width:760px;margin:0 auto;padding:28px 20px 56px}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:3px}
+h1,h2,h3{text-wrap:balance}
+.date{font-size:14px;color:var(--ink3);margin:0}
+h1{font-size:30px;line-height:1.3;font-weight:700;margin:2px 0 14px;letter-spacing:.02em}
+.lede{font-size:18px;line-height:1.85;margin:0 0 18px;max-width:36em}
+.meta{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:14px;color:var(--ink2);margin:0 0 18px}
+.meta b{font-weight:500;color:var(--ink);font-size:16px;margin-right:2px;font-variant-numeric:tabular-nums}
+.sample{font-size:13px;color:var(--ink2);border:1px dashed var(--line);padding:6px 10px;border-radius:6px;margin:0 0 20px}
+.status{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 22px;padding:0;list-style:none}
+.status a{display:inline-flex;align-items:baseline;gap:6px;text-decoration:none;font-size:13px;padding:4px 11px;border-radius:6px;border:1px solid var(--line);background:var(--paper)}
+.status b{font-weight:500}
+.status .s-none{color:var(--ink3)}
+.status .s-error{color:var(--warn);font-weight:500}
+.status li.err a{border-color:var(--warn)}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px}
+.card-title{font-size:15px;font-weight:500;margin:0 0 4px}
+.note{font-size:13px;color:var(--ink3);margin:8px 0 0}
+#map{width:100%;min-height:200px}
+#map svg{display:block;width:100%;height:auto;overflow:visible}
+.m-link{stroke-opacity:.5;transition:stroke-opacity .25s}
+.m-node{cursor:pointer;transition:opacity .25s}
+.m-node.dim{opacity:.2}
+.m-link.dim{stroke-opacity:.08}
+.m-theme circle{stroke:var(--paper);stroke-width:2}
+.m-theme text{fill:var(--paper);font-size:13px;font-weight:700}
+.m-kw rect{fill:var(--paper);stroke:var(--line);stroke-width:1}
+.m-kw.shared rect{stroke:var(--ink);stroke-width:1.6}
+.m-kw text{fill:var(--ink);font-size:12px}
+.m-kw.on rect{fill:var(--ink);stroke:var(--ink)}
+.m-kw.on text{fill:var(--paper)}
+.m-node:focus-visible{outline:none}
+.m-node:focus-visible rect,.m-node:focus-visible circle{stroke:var(--focus);stroke-width:3}
+.kw-fallback{display:flex;flex-wrap:wrap;gap:8px}
+.filters{display:grid;gap:8px;margin:14px 0 0}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font:inherit;font-size:14px;display:inline-flex;align-items:center;gap:7px;padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.chip .dot{width:10px;height:10px;border-radius:50%;background:var(--c)}
+.chip .n{color:var(--ink3);font-size:13px;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"] .n{color:inherit;opacity:.75}
+.chip.src{border-radius:6px;font-size:13px}
+.toggle{margin-left:auto}
+.pile-wrap{margin-top:14px}
+.pile-grid{display:flex;flex-wrap:wrap;gap:5px}
+.sq{position:relative;width:22px;height:22px;border-radius:5px;border:2px solid var(--c);background:var(--c);padding:0;cursor:pointer;transition:opacity .2s,background-color .2s}
+.sq.read{background:transparent}
+.sq.dim{opacity:.16}
+.sq.gap{margin-left:9px}
+.sq.has-art::after{content:"";position:absolute;right:-3px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--ink);border:2px solid var(--paper)}
+section{margin-top:44px}
+h2{font-size:21px;font-weight:700;margin:0 0 6px;line-height:1.4}
+.sec-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.sec-head .n{font-size:14px;color:var(--ink3)}
+.sub{font-size:14px;color:var(--ink2);margin:0 0 16px}
+.fail{font-size:14px;color:var(--warn);margin:0 0 12px}
+.picks{display:grid;gap:10px}
+.pick{display:grid;grid-template-columns:4px 1fr;gap:14px;text-decoration:none;background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px 14px 0;overflow:hidden}
+.pick::before{content:"";background:var(--c)}
+.pick strong{display:block;font-weight:500;line-height:1.6}
+.pick span{font-size:13px;color:var(--ink3)}
+.trend svg{display:block;width:100%;height:auto}
+.trend .lbl{font-size:11px;fill:var(--ink3)}
+.trend .val{font-size:12px;fill:var(--ink);font-weight:500}
+.trend .bar{fill:var(--line)}
+.trend .bar.today{fill:var(--ink)}
+.group{margin-top:22px}
+.theme-head{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid var(--c);padding-bottom:6px;margin-bottom:10px}
+.theme-head h3{font-size:17px;font-weight:700;margin:0}
+.theme-head .n{font-size:14px;color:var(--ink3)}
+.theme-sum{font-size:15px;color:var(--ink2);margin:0 0 6px}
+.item{padding:16px 0 18px;border-bottom:1px solid var(--line);scroll-margin-top:24px;min-width:0}
+.item:last-child{border-bottom:0}
+.item.flash{animation:flash 1.4s ease-out}
+@keyframes flash{0%,40%{background:color-mix(in srgb,var(--c) 16%,transparent)}100%{background:transparent}}
+.who{font-size:13px;color:var(--ink3);margin:0 0 2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
+.item h4{font-size:17px;font-weight:500;line-height:1.6;margin:0 0 8px}
+.item ul{margin:0 0 10px;padding-left:1.2em;color:var(--ink2);font-size:15px}
+.item li{margin:2px 0}
+.ref{display:grid;gap:2px;margin:0 0 10px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);font-size:14px;min-width:0}
+.ref small{font-size:12px;color:var(--ink3)}
+.ref .r-title{font-weight:500;overflow-wrap:anywhere}
+.ref .r-meta{font-size:12px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.flag{font-size:11px;font-weight:500;color:var(--warn);border:1px solid var(--warn);border-radius:4px;padding:0 6px}
+.ref.quote{border-left:3px solid var(--ink3);border-radius:2px 8px 8px 2px}
+.comment{margin:0 0 10px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--c) 10%,var(--paper));font-size:14px;color:var(--ink)}
+.comment small{display:block;font-size:12px;color:var(--ink3)}
+.kws{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.kw{font:inherit;font-size:12px;padding:2px 9px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer}
+.kw.on{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:13px;color:var(--ink3)}
+.must{color:var(--c);font-weight:500}
+.foot a{color:var(--ink);font-weight:500}
+.readbtn{font:inherit;font-size:13px;margin-left:auto;padding:3px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer}
+.readbtn[aria-pressed="true"]{color:var(--ink3);border-style:dashed}
+.item.is-read h4,.item.is-read .rt{color:var(--ink3)}
+.company{margin-top:22px}
+.company h3{font-size:17px;font-weight:700;margin:0 0 4px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.company .none{font-size:14px;color:var(--ink3);margin:6px 0 0}
+.company .none.err{color:var(--warn)}
+.gh{list-style:none;margin:0;padding:0}
+.gh .item{display:grid;grid-template-columns:2em minmax(0,1fr);gap:4px 10px;padding:12px 0}
+.rank{font-family:var(--mono);font-size:14px;color:var(--ink3);font-variant-numeric:tabular-nums;padding-top:2px}
+.gh .rt{font-weight:500;overflow-wrap:anywhere}
+.gh .rt a{text-decoration:none}
+.gh .rt a:hover{text-decoration:underline}
+.gbar{display:grid;grid-template-columns:minmax(0,1fr) 5.5em;gap:10px;align-items:center;margin:4px 0}
+.gbar .track{height:10px;border-radius:5px;background:color-mix(in srgb,var(--line) 55%,transparent)}
+.gbar .fill{height:10px;border-radius:5px;background:var(--c);width:calc(var(--s) * 100%)}
+.gbar .v{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.gmeta{font-size:12px;color:var(--ink3);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.gsum{font-size:14px;color:var(--ink2);margin:2px 0 6px}
+.streak{font-size:11px;font-weight:500;border:1px solid var(--ink3);color:var(--ink2);border-radius:4px;padding:0 6px}
+.cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:14px}
+.col h3{font-size:16px;font-weight:700;margin:0 0 4px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.col ol{list-style:none;margin:0;padding:0}
+.col .item{display:grid;grid-template-columns:1.6em minmax(0,1fr);gap:2px 8px;padding:10px 0}
+.col .rt{font-size:14px;font-weight:500;line-height:1.55}
+.col .rt a{text-decoration:none}
+.col .rt a:hover{text-decoration:underline}
+.col .gsum{font-size:13px}
+.col .viz{grid-column:1/-1}
+.col .foot,.gh .foot{grid-column:2}
+.viz{margin:2px 0 12px;padding:14px;border-radius:10px;background:color-mix(in srgb,var(--c) 7%,var(--paper));border:1px solid color-mix(in srgb,var(--c) 28%,var(--line));font-size:13px;line-height:1.55}
+.viz-label{font-size:12px;color:var(--ink3);margin:0 0 8px}
+.ba-row{display:grid;grid-template-columns:4.5em 1fr 3.6em;align-items:center;gap:10px;margin:4px 0}
+.ba-track{height:12px}
+.ba-bar{height:12px;border-radius:6px;background:var(--ink3);opacity:.45;transform-origin:left;transform:scaleX(var(--s))}
+.ba-bar.after{background:var(--c);opacity:1}
+.ba-val{text-align:right;font-weight:500;font-variant-numeric:tabular-nums}
+.ba-delta{margin:8px 0 0;font-weight:500;color:var(--c)}
+.ba-t{display:grid;grid-template-columns:1fr 22px 1fr;gap:8px;align-items:stretch}
+.ba-box{border-radius:8px;padding:8px 10px;border:1px dashed var(--ink3);color:var(--ink2)}
+.ba-box.after{border:2px solid var(--c);color:var(--ink);background:var(--paper)}
+.ba-box small{display:block;font-size:11px;color:var(--ink3);margin-bottom:2px}
+.ba-arrow{align-self:center;color:var(--c)}
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;list-style:none;margin:0;padding:0}
+.flow li{display:flex;align-items:center;gap:6px}
+.step{padding:5px 10px;border-radius:8px;border:1px solid var(--c);background:var(--paper)}
+.flow li:last-child .step{background:var(--c);color:var(--paper);border-color:var(--c);font-weight:500}
+.arrow{color:var(--c)}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.opt{border-top:3px solid var(--c);background:var(--paper);padding:8px 10px;border-radius:4px 4px 8px 8px}
+.opt b{display:block;font-weight:500;color:var(--ink)}
+.opt span{color:var(--ink3);font-size:12px}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:stretch}
+.side{border:1px dashed var(--ink3);border-radius:8px;padding:8px 10px;transition:opacity .6s}
+.side b{display:block;font-weight:500}
+.side span{color:var(--ink3);font-size:12px}
+.side.win{border:2px solid var(--c);background:var(--paper)}
+.side.lose{opacity:.55}
+.badge{display:inline-block;font-size:11px;font-weight:500;color:var(--paper);background:var(--c);border-radius:4px;padding:0 6px;margin-bottom:3px}
+.vs-mid{align-self:center;font-size:12px;color:var(--ink3)}
+.vs-cap{margin:8px 0 0;color:var(--ink2)}
+.stat{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.stat .num{font-size:44px;font-weight:700;line-height:1;color:var(--c);font-variant-numeric:tabular-nums}
+.stat .unit{font-size:16px;font-weight:500;color:var(--c);margin-left:2px}
+.stat .lab{color:var(--ink2);font-size:14px}
+details.excl{margin-top:44px;border-top:1px solid var(--line);padding-top:14px}
+details.excl summary{cursor:pointer;font-size:15px;font-weight:500}
+details.excl summary span{color:var(--ink3);font-weight:400;font-size:13px;margin-left:6px}
+.excl ul{list-style:none;margin:10px 0 0;padding:0;font-size:14px}
+.excl li{display:grid;grid-template-columns:5.5em minmax(0,1fr) 3.5em;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.excl li small{color:var(--ink3);font-size:12px}
+.excl .p{font-family:var(--mono);font-size:12px;text-align:right;color:var(--ink3)}
+.excl a{overflow-wrap:anywhere}
+@media (prefers-reduced-motion:no-preference){
+  .sq{animation:drop .42s cubic-bezier(.2,.8,.3,1) both;animation-delay:calc(var(--i)*18ms)}
+  @keyframes drop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+  .ba-bar{transition:transform .9s cubic-bezier(.2,.8,.3,1)}
+  .viz.wait .ba-bar{transform:scaleX(0)}
+  .ba-box.after,.ba-arrow{transition:opacity .5s .35s,transform .5s .35s}
+  .viz.wait .ba-box.after,.viz.wait .ba-arrow{opacity:0;transform:translateX(-8px)}
+  .flow li{transition:opacity .4s,transform .4s;transition-delay:calc(var(--i)*140ms)}
+  .viz.wait .flow li{opacity:0;transform:translateX(-6px)}
+  .opt{transition:opacity .4s,transform .4s;transition-delay:calc(var(--i)*120ms)}
+  .viz.wait .opt{opacity:0;transform:translateY(6px)}
+  .viz.wait .side.lose{opacity:1}
+  .gbar .fill{transition:width .8s cubic-bezier(.2,.8,.3,1)}
+}
+.empty{font-size:15px;color:var(--ink2);padding:20px 0}
+footer{margin-top:48px;font-size:13px;color:var(--ink3)}
+[hidden]{display:none!important}
+@media (max-width:640px){.cols{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:480px){main{padding:24px 16px 48px}h1{font-size:26px}.lede{font-size:17px}.toggle{margin-left:0}.vs{grid-template-columns:1fr}.vs-mid{justify-self:center}.ba-t{grid-template-columns:1fr}.ba-arrow{justify-self:center;transform:rotate(90deg)}.excl li{grid-template-columns:minmax(0,1fr) 3.5em}.excl li small{grid-column:1/-1}}
+</style>
+
+<main>
+  <header>
+    <p class="date" id="date"></p>
+    <h1>ブックマーク日報</h1>
+    <p class="lede" id="lede"></p>
+    <p class="meta" id="meta"></p>
+    <p class="sample" id="sample" hidden>これはサンプルデータです。ルーチンが毎朝この内容を差し替えます。</p>
+    <ul class="status" id="status" aria-label="情報源ごとの取得状況"></ul>
+  </header>
+
+  <div class="card">
+    <p class="card-title">今日の話題マップ</p>
+    <div id="map" aria-label="トピックとキーワードのつながり"></div>
+    <p class="note">丸がトピック（数字は件数）、四角が複数の項目に出てきたキーワードです。太枠のキーワードは2つ以上のトピックにまたがっています。押すと関連する項目だけに絞り込めます。ブックマーク、ブログ、トレンドのすべてが対象です。</p>
+    <div class="filters">
+      <div class="chips" id="chips" role="group" aria-label="トピックで絞り込み"></div>
+      <div class="chips" id="srcchips" role="group" aria-label="情報源で絞り込み"></div>
+    </div>
+    <div class="pile-wrap">
+      <div class="pile-grid" id="pile" aria-label="項目ごとの既読状況"></div>
+      <p class="note">1マスが1件です。塗りつぶしは未読、枠だけは既読。右上に点があるマスは記事付きの投稿です。マスを押すとその項目に移動します。</p>
+    </div>
+  </div>
+
+  <section id="picks-sec">
+    <h2>まず読む3件</h2>
+    <p class="sub">重要度と、ほかの項目とのつながりから選んでいます。</p>
+    <div class="picks" id="picks"></div>
+  </section>
+
+  <section id="sec-bookmarks">
+    <div class="sec-head"><h2>ブックマーク</h2><span class="n" id="n-bookmarks"></span></div>
+    <p class="fail" id="fail-bookmarks" hidden></p>
+    <div id="bookmarks"></div>
+  </section>
+
+  <section id="sec-blogs">
+    <div class="sec-head"><h2>公式テックブログ</h2><span class="n" id="n-blogs"></span></div>
+    <div id="blogs"></div>
+  </section>
+
+  <section id="sec-trends">
+    <h2>今日のトレンド</h2>
+    <div id="sec-github">
+      <div class="sec-head"><h3 style="font-size:17px;margin:14px 0 0">GitHub　今日スターが増えたリポジトリ</h3></div>
+      <p class="fail" id="fail-github" hidden></p>
+      <p class="note" id="note-github" hidden></p>
+      <ol class="gh" id="github"></ol>
+    </div>
+    <div class="cols" id="cols"></div>
+  </section>
+
+  <p class="empty" id="empty" hidden>この条件に当てはまる項目はありません。「すべて」を押すと全件に戻ります。</p>
+
+  <section>
+    <h2>ブックマークの推移</h2>
+    <p class="sub" id="trend-sub"></p>
+    <div class="card trend"><svg id="trend" viewBox="0 0 640 170" role="img" aria-label="直近14日間の新着ブックマーク件数"></svg></div>
+  </section>
+
+  <details class="excl" id="excl">
+    <summary>除外した項目<span id="excl-n"></span></summary>
+    <p class="note">Jevのテック判定で「テック系ではない」とした項目です。誤判定がないか確かめるために残しています。数字はテック系である確率です。</p>
+    <ul id="excl-list"></ul>
+  </details>
+
+  <footer id="footer"></footer>
+</main>
+
+<script type="application/json" id="report-data">
+{
+ "date": "2026-10-03",
+ "generated_at": "2026-10-03T07:06:00+09:00",
+ "sample": true,
+ "lede": "ブックマークはエージェントの運用設計が中心で、公式ブログでもツール連携の更新が続きました。トレンドでは、Jevを試す記事がQiita・Zenn・DevelopersIOのすべてで上位に入っています。",
+ "themes": [
+  {"id": "llm_agents", "name": "LLM・AIエージェント", "summary": "ツールの絞り込みや中間成果の保存など、エージェントを実運用で安定させる工夫が中心です。"},
+  {"id": "devops", "name": "DevOps・CI/CD", "summary": "cronの遅延やシークレットの更新など、自動化を壊れにくくする話題です。"},
+  {"id": "product_ux", "name": "プロダクト・UX", "summary": "機能を減らす判断と、空の状態の設計についての投稿です。"},
+  {"id": "devtools", "name": "開発ツール・エディタ", "summary": "ターミナル周りのツールと、小さなCLIの保守についての話題です。"},
+  {"id": "cloud_infra", "name": "クラウド・インフラ", "summary": "マネージドサービスの新機能と、移行の手順がまとまった記事です。"}
+ ],
+ "picks": ["s1", "s3", "b1"],
+ "trend": [
+  {"date": "2026-09-20", "count": 6}, {"date": "2026-09-21", "count": 9}, {"date": "2026-09-22", "count": 4},
+  {"date": "2026-09-23", "count": 11}, {"date": "2026-09-24", "count": 7}, {"date": "2026-09-25", "count": 3},
+  {"date": "2026-09-26", "count": 8}, {"date": "2026-09-27", "count": 12}, {"date": "2026-09-28", "count": 5},
+  {"date": "2026-09-29", "count": 10}, {"date": "2026-09-30", "count": 7}, {"date": "2026-10-01", "count": 14},
+  {"date": "2026-10-02", "count": 9}, {"date": "2026-10-03", "count": 6}
+ ],
+ "source_status": [
+  {"source": "bookmarks", "label": "ブックマーク", "status": "ok", "count": 6},
+  {"source": "blogs", "label": "公式ブログ", "status": "ok", "count": 2},
+  {"source": "github", "label": "GitHub", "status": "ok", "count": 5},
+  {"source": "qiita", "label": "Qiita", "status": "ok", "count": 3},
+  {"source": "zenn", "label": "Zenn", "status": "ok", "count": 3},
+  {"source": "devio", "label": "DevelopersIO", "status": "error", "count": 0, "message": "ページ構造の読み取りに失敗"}
+ ],
+ "blog_companies": [
+  {"company": "anthropic", "label": "Anthropic", "status": "ok", "count": 1},
+  {"company": "openai", "label": "OpenAI", "status": "none", "count": 0},
+  {"company": "google", "label": "Google", "status": "ok", "count": 1},
+  {"company": "aws", "label": "AWS", "status": "none", "count": 0},
+  {"company": "x", "label": "X", "status": "error", "count": 0}
+ ],
+ "posts": [
+  {"id": "s1", "theme": "llm_agents", "author": "加藤", "handle": "kato_agents", "url": "https://x.com/kato_agents/status/1840000000000000001",
+   "kind": "quote_article", "title": "エージェントのツールは「少数・高抽象」にすると選択ミスが減る",
+   "article": {"title": "ツールを12個から5個に統合した話", "domain": "example.com", "url": "https://example.com/post/agent-tools", "fetch_status": "ok"},
+   "quoted": {"author": "Rin", "handle": "mlnotes_rin", "url": "https://x.com/mlnotes_rin/status/1839999999999999999", "claim": "ツールは多いほどエージェントの能力が上がる、という前提で設計していた。"},
+   "comment": "記事の結論に賛成しつつ、統合しすぎると説明文が長くなり逆効果だと補足している。",
+   "points": ["記事: ツールを統合したら誤選択が減った", "ツールの説明に失敗例を1つ添えると効果が大きい"],
+   "keywords": ["ツール設計", "精度"], "importance": 3, "read_min": 6,
+   "visual": {"type": "before_after", "label": "ツールの数", "before": {"label": "統合前", "value": 12}, "after": {"label": "統合後", "value": 5}, "unit": "個"}},
+  {"id": "s2", "theme": "llm_agents", "author": "Sora Lab", "handle": "sora_ai_lab", "url": "https://x.com/sora_ai_lab/status/1840000000000000004",
+   "kind": "post", "title": "長時間タスクは中間成果をファイルに書き出すと安定する",
+   "points": ["コンテキストがあふれても途中から再開できる", "進捗ファイルを人が読める形にしておくとデバッグも楽"],
+   "keywords": ["長時間タスク", "再開性"], "importance": 2, "read_min": 1,
+   "visual": {"type": "flow", "steps": ["作業を進める", "中間成果を保存", "中断やあふれ", "ファイルから再開"]}},
+  {"id": "s3", "theme": "devops", "author": "はる", "handle": "terminal_haru", "url": "https://x.com/terminal_haru/status/1840000000000000007",
+   "kind": "article", "title": "GitHub Actionsのcronは数分〜数十分の遅れを前提に設計する",
+   "article": {"title": "定期実行のジョブを時刻に依存させない", "domain": "blog.example.jp", "url": "https://blog.example.jp/cron-delay", "fetch_status": "partial"},
+   "comment": "後続のジョブは時刻ではなく成果物の有無で判断させるべきだと述べている。",
+   "points": ["混雑する正時は特に遅れやすいので分をずらす", "記事の本文は一部のみ取得"],
+   "keywords": ["cron", "自動化"], "importance": 3, "read_min": 4,
+   "visual": {"type": "before_after", "before": {"label": "設定した時刻", "text": "6:00ちょうど"}, "after": {"label": "実際の実行", "text": "数分〜数十分遅れる"}}},
+  {"id": "s4", "theme": "devops", "author": "めい", "handle": "ci_cd_mei", "url": "https://x.com/ci_cd_mei/status/1840000000000000009",
+   "kind": "quote", "title": "シークレットのローテーションを自動化する3つのパターン",
+   "quoted": {"author": "けん", "handle": "dotfiles_ken", "url": "https://x.com/dotfiles_ken/status/1840000000000000008", "claim": "トークンの更新を手作業でやっていて、毎回どこかで止まる。"},
+   "comment": "手作業の更新に対し、方式ごとの運用コストと安全性の違いを整理して返している。",
+   "points": ["方式ごとに運用コストと安全性のバランスが違う"],
+   "keywords": ["シークレット", "自動化"], "importance": 2, "read_min": 2,
+   "visual": {"type": "options", "items": [{"name": "CIが自分のSecretを更新", "note": "追加サービス不要"}, {"name": "シークレットマネージャー", "note": "管理を一元化"}, {"name": "短命トークンを都度発行", "note": "漏えい時の被害が小さい"}]}},
+  {"id": "s5", "theme": "product_ux", "author": "ななみ", "handle": "ux_nanami", "url": "https://x.com/ux_nanami/status/1840000000000000011",
+   "kind": "article", "title": "空の状態は「次にやること」を示すための場所",
+   "article": {"title": "Empty states that work", "domain": "design.example.com", "url": "https://design.example.com/empty-states", "fetch_status": "blocked"},
+   "comment": "記事を紹介し、自社の管理画面でも同じ失敗をしていたと書いている。",
+   "points": ["「データがありません」だけで終わらせない", "記事の本文は未取得（タイトルと概要から要約）"],
+   "keywords": ["空の状態", "導線"], "importance": 2, "read_min": 3},
+  {"id": "s6", "theme": "devtools", "author": "Go", "handle": "rustacean_go", "url": "https://x.com/rustacean_go/status/1840000000000000010",
+   "kind": "post", "title": "小さなCLIは標準ライブラリだけで書くと保守が楽",
+   "points": ["依存の更新対応がほぼ不要になる"], "keywords": ["CLI", "保守性"], "importance": 1, "read_min": 1,
+   "visual": {"type": "versus", "a": {"label": "依存ライブラリを使う", "note": "更新対応が続く"}, "b": {"label": "標準ライブラリだけ", "note": "保守が楽"}, "winner": "b"}}
+ ],
+ "blogs": [
+  {"id": "b1", "company": "anthropic", "company_label": "Anthropic", "blog": "Engineering", "theme": "llm_agents",
+   "title": "（サンプル）長時間動くエージェントのための足場の設計", "url": "https://www.anthropic.com/engineering",
+   "points": ["進捗の記録と再開の手順を最初に決めておく", "評価は小さく始めて失敗例を足していく"],
+   "keywords": ["長時間タスク", "評価"], "importance": 3, "read_min": 9,
+   "visual": {"type": "flow", "steps": ["計画を書き出す", "1機能ずつ実装", "進捗を記録", "次のセッションで再開"]}},
+  {"id": "b2", "company": "google", "company_label": "Google", "blog": "Google Developers Blog", "theme": "cloud_infra",
+   "title": "（サンプル）マネージド実行環境で関数のコールドスタートを短くする", "url": "https://developers.googleblog.com/",
+   "points": ["最小インスタンス数を1にすると初回の遅れが消える"], "keywords": ["コールドスタート"], "importance": 1, "read_min": 5}
+ ],
+ "github": [
+  {"id": "g1", "rank": 1, "title": "example/agent-harness", "url": "https://github.com/trending", "language": "TypeScript", "stars_today": 1240, "stars_total": 18300, "theme": "llm_agents", "streak_days": 2,
+   "summary": "コーディングエージェントを長時間動かすための実行環境。進捗ファイルと再開の仕組みを持つ。", "keywords": ["長時間タスク", "再開性"],
+   "visual": {"type": "stat", "value": 1240, "unit": "スター", "label": "今日増えたスター"}},
+  {"id": "g2", "rank": 2, "title": "example/tiny-cli-kit", "url": "https://github.com/trending", "language": "Go", "stars_today": 860, "stars_total": 4100, "theme": "devtools", "streak_days": 1,
+   "summary": "依存なしで小さなCLIを作るためのテンプレート集。", "keywords": ["CLI"]},
+  {"id": "g3", "rank": 3, "title": "example/secret-rotator", "url": "https://github.com/trending", "language": "Python", "stars_today": 530, "stars_total": 2200, "theme": "security", "streak_days": 1,
+   "summary": "CIからシークレットを定期的に更新するツール。", "keywords": ["シークレット", "自動化"]},
+  {"id": "g4", "rank": 4, "title": "example/ui-states", "url": "https://github.com/trending", "language": "TypeScript", "stars_today": 310, "stars_total": 950, "theme": "frontend", "streak_days": 1,
+   "summary": "空の状態や読み込み中の表示をまとめたUI部品集。"},
+  {"id": "g5", "rank": 5, "title": "example/pg-diff", "url": "https://github.com/trending", "language": "Rust", "stars_today": 180, "stars_total": 1400, "theme": "database", "streak_days": 3,
+   "summary": "PostgreSQLのスキーマの差分を出すツール。"}
+ ],
+ "articles": [
+  {"id": "q1", "site": "qiita", "rank": 1, "title": "（サンプル）判断特化モデルで問い合わせを振り分けてみた", "url": "https://qiita.com/", "theme": "llm_agents", "streak_days": 2, "summary": "問い合わせを部署に振り分ける処理を、確率付きの判定に置き換えた手順。", "keywords": ["評価"],
+   "visual": {"type": "versus", "a": {"label": "文章生成で分類", "note": "出力の解析が必要"}, "b": {"label": "判定専用モデル", "note": "確率がそのまま使える"}, "winner": "b"}},
+  {"id": "q2", "site": "qiita", "rank": 2, "title": "（サンプル）GitHub Actionsでcronが遅れる理由", "url": "https://qiita.com/", "theme": "devops", "streak_days": 1, "summary": "正時の混雑で遅れる仕組みと、分をずらす対策。", "keywords": ["cron"]},
+  {"id": "q3", "site": "qiita", "rank": 3, "title": "（サンプル）新人向けレビューの粒度", "url": "https://qiita.com/", "theme": "career", "streak_days": 1, "summary": "小さなPRを頻繁に見るほうが学びが多いという整理。"},
+  {"id": "z1", "site": "zenn", "rank": 1, "title": "（サンプル）AI開発の時代にテストの役割を見直す", "url": "https://zenn.dev/", "theme": "devtools", "streak_days": 1, "summary": "生成したコードの確認を、テストの書き方から組み立て直す提案。", "keywords": ["保守性"]},
+  {"id": "z2", "site": "zenn", "rank": 2, "title": "（サンプル）MCPサーバーを小さく作る", "url": "https://zenn.dev/", "theme": "llm_agents", "streak_days": 1, "summary": "ツールを3つに絞ったMCPサーバーの実装例。", "keywords": ["ツール設計"]},
+  {"id": "z3", "site": "zenn", "rank": 3, "title": "（サンプル）SwiftUIの状態管理の整理", "url": "https://zenn.dev/", "theme": "mobile", "streak_days": 1, "summary": "画面の状態をどこに置くかの判断基準。"}
+ ],
+ "excluded": [
+  {"source": "bookmark", "title": "週末に行った喫茶店のナポリタンがとてもおいしかった", "tech_prob": 0.04, "url": "https://x.com/"},
+  {"source": "zenn", "title": "（サンプル）フリーランス1年目の確定申告", "tech_prob": 0.31, "url": "https://zenn.dev/"}
+ ]
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script>
+(function(){
+  var D;
+  try { D = JSON.parse(document.getElementById('report-data').textContent); }
+  catch(e){ document.getElementById('lede').textContent = 'レポートのデータを読み込めませんでした。ルーチンの実行ログを確認してください。'; return; }
+
+  // config/topics.json と同じ並び。色はこの並びで固定する（日をまたいで同じ色）
+  var TOPICS = [
+    ['llm_agents','LLM・AIエージェント'],['ml_data','機械学習・データサイエンス'],['frontend','Web・フロントエンド'],
+    ['backend','バックエンド・API'],['cloud_infra','クラウド・インフラ'],['devops','DevOps・CI/CD'],['security','セキュリティ'],
+    ['database','データベース・データ基盤'],['mobile','モバイル'],['devtools','開発ツール・エディタ'],['product_ux','プロダクト・UX'],
+    ['career','キャリア・組織'],['other','その他']
+  ];
+  var tIdx = {}, tName = {};
+  TOPICS.forEach(function(t, i){ tIdx[t[0]] = i; tName[t[0]] = t[1]; });
+  (D.themes || []).forEach(function(t){ if (t.name && tIdx[t.id] !== undefined) tName[t.id] = t.name; });
+  function cvar(id){ var i = tIdx[id]; return 'var(--t' + (i === undefined ? 12 : i) + ')'; }
+  function safeUrl(u){ return (typeof u === 'string' && /^https:\/\//.test(u)) ? u : null; }
+  function el(tag, attrs, text){
+    var n = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function(k){ n.setAttribute(k, attrs[k]); });
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  var NS = 'http://www.w3.org/2000/svg';
+  function sv(tag, attrs, text){
+    var n = document.createElementNS(NS, tag);
+    if (attrs) Object.keys(attrs).forEach(function(k){ n.setAttribute(k, attrs[k]); });
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function link(url, text){ var u = safeUrl(url); return u ? el('a', {href: u, target: '_blank', rel: 'noopener noreferrer'}, text) : el('span', null, text); }
+  function fmt(n){ return typeof n === 'number' ? n.toLocaleString('ja-JP') : ''; }
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var KEY = 'xbm-read', read = {};
+  try { read = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch(e){ read = {}; }
+  function saveRead(){ try { localStorage.setItem(KEY, JSON.stringify(read)); } catch(e){} }
+
+  // ---------- すべての情報源をひとつの項目の列にする ----------
+  var SRC = {bookmarks: 'ブックマーク', blogs: '公式ブログ', github: 'GitHub', qiita: 'Qiita', zenn: 'Zenn', devio: 'DevelopersIO'};
+  var SRC_ORDER = ['bookmarks', 'blogs', 'github', 'qiita', 'zenn', 'devio'];
+  var items = [];
+  (D.posts || []).forEach(function(p){ p._src = 'bookmarks'; items.push(p); });
+  (D.blogs || []).forEach(function(p){ p._src = 'blogs'; items.push(p); });
+  (D.github || []).forEach(function(p){ p._src = 'github'; items.push(p); });
+  (D.articles || []).forEach(function(p){ p._src = p.site; items.push(p); });
+  var byId = {}; items.forEach(function(p){ byId[p.id] = p; });
+  function readMin(p){ return p.read_min || 0; }
+
+  // ---------- 冒頭 ----------
+  var wd = ['日','月','火','水','木','金','土'], dp = (D.date || '').split('-').map(Number);
+  if (dp.length === 3) {
+    var dt = new Date(dp[0], dp[1]-1, dp[2]);
+    document.getElementById('date').textContent = dp[0] + '年' + dp[1] + '月' + dp[2] + '日（' + wd[dt.getDay()] + '）';
+  }
+  document.getElementById('lede').textContent = D.lede || '';
+  if (D.sample) document.getElementById('sample').hidden = false;
+  var meta = document.getElementById('meta');
+  var totalMin = items.reduce(function(s,p){ return s + readMin(p); }, 0);
+  var trendN = (D.github || []).length + (D.articles || []).length;
+  [['ブックマーク', (D.posts || []).length + '件'], ['公式ブログ', (D.blogs || []).length + '件'], ['トレンド', trendN + '件'], ['読了目安', '約' + totalMin + '分']].forEach(function(m){
+    var s = el('span'); s.appendChild(el('b', null, m[1])); s.appendChild(document.createTextNode(m[0])); meta.appendChild(s);
+  });
+
+  var ANCHOR = {bookmarks: 'sec-bookmarks', blogs: 'sec-blogs', github: 'sec-github', qiita: 'col-qiita', zenn: 'col-zenn', devio: 'col-devio'};
+  var statusBy = {};
+  (D.source_status || []).forEach(function(s){ statusBy[s.source] = s; });
+  var stList = document.getElementById('status');
+  (D.source_status || []).forEach(function(s){
+    var li = el('li'); if (s.status === 'error') li.className = 'err';
+    var a = el('a', {href: '#' + (ANCHOR[s.source] || '')});
+    a.appendChild(el('span', null, s.label || SRC[s.source] || s.source));
+    if (s.status === 'ok') a.appendChild(el('b', null, '新着' + (s.count || 0) + '件'));
+    else if (s.status === 'none') a.appendChild(el('span', {'class': 's-none'}, '更新なし'));
+    else a.appendChild(el('span', {'class': 's-error'}, '取得失敗'));
+    if (s.message) a.title = s.message;
+    a.addEventListener('click', function(e){ var t = document.getElementById(ANCHOR[s.source]); if (t) { e.preventDefault(); t.scrollIntoView({behavior: reduced ? 'auto' : 'smooth', block: 'start'}); } });
+    li.appendChild(a); stList.appendChild(li);
+  });
+
+  // ---------- 絞り込みの状態 ----------
+  var state = { theme: null, keyword: null, source: null, unread: false };
+
+  var kwItems = {};
+  items.forEach(function(p){ (p.keywords || []).forEach(function(k){ (kwItems[k] = kwItems[k] || []).push(p); }); });
+  var mapKws = Object.keys(kwItems).filter(function(k){ return kwItems[k].length >= 2; })
+    .sort(function(a,b){ return kwItems[b].length - kwItems[a].length; }).slice(0, 14);
+  var themeIds = TOPICS.map(function(t){ return t[0]; }).filter(function(id){ return items.some(function(p){ return p.theme === id; }); });
+
+  var mapEls = { kw: {}, theme: {}, links: [] }, lastW = 0;
+  function setKeyword(k){ state.keyword = (state.keyword === k ? null : k); if (state.keyword) state.theme = null; apply(); }
+  function setTheme(t){ state.theme = t; if (t) state.keyword = null; apply(); }
+
+  function renderMap(){
+    var box = document.getElementById('map'), W = box.clientWidth || 600;
+    if (Math.abs(W - lastW) < 8 && box.firstChild) return;
+    lastW = W; box.textContent = ''; mapEls = { kw: {}, theme: {}, links: [] };
+    if (!window.d3 || !themeIds.length) {
+      var fb = el('div', {'class': 'kw-fallback'});
+      mapKws.forEach(function(k){
+        var b = el('button', {'class': 'kw', 'type': 'button'}, k + '（' + kwItems[k].length + '）');
+        b.addEventListener('click', function(){ setKeyword(k); });
+        mapEls.kw[k] = { fb: b }; fb.appendChild(b);
+      });
+      box.appendChild(fb); return;
+    }
+    var H = W < 520 ? 440 : 370, nodes = [], links = [];
+    themeIds.forEach(function(id){
+      var n = items.filter(function(p){ return p.theme === id; }).length;
+      var r = 14 + Math.sqrt(n) * 6.5;
+      nodes.push({ id: 't:' + id, kind: 'theme', tid: id, n: n, r: r, hw: r, hh: r });
+    });
+    mapKws.forEach(function(k){
+      var w = k.length * 12.5 + 22, ts = {};
+      kwItems[k].forEach(function(p){ ts[p.theme] = (ts[p.theme] || 0) + 1; });
+      var tids = Object.keys(ts).filter(function(id){ return themeIds.indexOf(id) >= 0; });
+      nodes.push({ id: 'k:' + k, kind: 'kw', k: k, w: w, r: w / 2 + 2, hw: w / 2, hh: 13, shared: tids.length >= 2, themes: tids });
+      tids.forEach(function(id){ links.push({ source: 'k:' + k, target: 't:' + id, w: ts[id], theme: id }); });
+    });
+    var sim = d3.forceSimulation(nodes)
+      .force('link', d3.forceLink(links).id(function(d){ return d.id; }).distance(function(l){ return l.target.r + 46; }).strength(0.7))
+      .force('charge', d3.forceManyBody().strength(-240))
+      .force('collide', d3.forceCollide().radius(function(d){ return d.r + 6; }).iterations(3))
+      .force('x', d3.forceX(W / 2).strength(0.06))
+      .force('y', d3.forceY(H / 2).strength(W < 520 ? 0.05 : 0.09))
+      .stop();
+    function clamp(){ nodes.forEach(function(n){ n.x = Math.max(n.hw + 4, Math.min(W - n.hw - 4, n.x)); n.y = Math.max(n.hh + 4, Math.min(H - n.hh - 4, n.y)); }); }
+    for (var i = 0; i < 360; i++) { sim.tick(); clamp(); }
+
+    var svg = sv('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'group', 'aria-label': '話題マップ' });
+    var gl = sv('g'), gn = sv('g'); svg.appendChild(gl); svg.appendChild(gn);
+    links.forEach(function(l){
+      var line = sv('line', { x1: l.source.x, y1: l.source.y, x2: l.target.x, y2: l.target.y, 'class': 'm-link', 'stroke-width': 1 + l.w * 1.2 });
+      line.style.stroke = cvar(l.theme); gl.appendChild(line); mapEls.links.push({ el: line, kw: l.source.k, theme: l.theme });
+    });
+    nodes.forEach(function(n){
+      var g = sv('g', { 'class': 'm-node ' + (n.kind === 'theme' ? 'm-theme' : 'm-kw' + (n.shared ? ' shared' : '')), transform: 'translate(' + n.x + ',' + n.y + ')', tabindex: '0', role: 'button' });
+      var act;
+      if (n.kind === 'theme') {
+        g.setAttribute('aria-label', tName[n.tid] + '：' + n.n + '件');
+        var c = sv('circle', { r: n.r }); c.style.fill = cvar(n.tid); g.appendChild(c);
+        g.appendChild(sv('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, n.n));
+        g.appendChild(sv('title', null, tName[n.tid]));
+        act = function(){ setTheme(state.theme === n.tid ? null : n.tid); };
+        mapEls.theme[n.tid] = g;
+      } else {
+        g.setAttribute('aria-label', 'キーワード ' + n.k + '：' + kwItems[n.k].length + '件');
+        g.appendChild(sv('rect', { x: -n.w / 2, y: -13, width: n.w, height: 26, rx: 6 }));
+        g.appendChild(sv('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, n.k));
+        act = function(){ setKeyword(n.k); };
+        mapEls.kw[n.k] = { g: g, themes: n.themes };
+      }
+      g.addEventListener('click', act);
+      g.addEventListener('keydown', function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+      gn.appendChild(g);
+    });
+    box.appendChild(svg);
+  }
+
+  // ---------- 絞り込みのボタン ----------
+  var chips = document.getElementById('chips'), srcchips = document.getElementById('srcchips');
+  function chip(label, count, themeId){
+    var b = el('button', {'class': 'chip', 'type': 'button', 'aria-pressed': 'false'});
+    if (themeId) { var d = el('span', {'class': 'dot', 'aria-hidden': 'true'}); d.style.setProperty('--c', cvar(themeId)); b.appendChild(d); }
+    b.appendChild(document.createTextNode(label));
+    if (count != null) b.appendChild(el('span', {'class': 'n'}, count));
+    b.addEventListener('click', function(){ state.keyword = null; setTheme(themeId); });
+    b._theme = themeId; chips.appendChild(b); return b;
+  }
+  var allChip = chip('すべて', null, null);
+  themeIds.forEach(function(id){ chip(tName[id], items.filter(function(p){ return p.theme === id; }).length, id); });
+  var kwChip = el('button', {'class': 'chip', 'type': 'button', 'aria-pressed': 'true', 'hidden': ''});
+  kwChip.addEventListener('click', function(){ state.keyword = null; apply(); });
+  chips.appendChild(kwChip);
+  var srcBtns = [];
+  SRC_ORDER.forEach(function(s){
+    var n = items.filter(function(p){ return p._src === s; }).length;
+    if (!n) return;
+    var b = el('button', {'class': 'chip src', 'type': 'button', 'aria-pressed': 'false'}, SRC[s]);
+    b.appendChild(el('span', {'class': 'n'}, n));
+    b.addEventListener('click', function(){ state.source = state.source === s ? null : s; apply(); });
+    b._src = s; srcBtns.push(b); srcchips.appendChild(b);
+  });
+  var unreadBtn = el('button', {'class': 'chip src toggle', 'type': 'button', 'aria-pressed': 'false'}, '未読だけ表示');
+  unreadBtn.addEventListener('click', function(){ state.unread = !state.unread; apply(); });
+  srcchips.appendChild(unreadBtn);
+
+  // ---------- 既読の一覧（マス） ----------
+  var ordered = [];
+  SRC_ORDER.forEach(function(s){
+    themeIds.forEach(function(id){ items.forEach(function(p){ if (p._src === s && p.theme === id) ordered.push(p); }); });
+    items.forEach(function(p){ if (p._src === s && themeIds.indexOf(p.theme) < 0) ordered.push(p); });
+  });
+  var pile = document.getElementById('pile'), squares = {}, prevSrc = null;
+  ordered.forEach(function(p, i){
+    var b = el('button', {'class': 'sq', 'type': 'button', 'aria-label': SRC[p._src] + '・' + (tName[p.theme] || '') + '：' + p.title});
+    if (prevSrc !== null && prevSrc !== p._src) b.classList.add('gap');
+    if (p._src === 'bookmarks' && p.article) b.classList.add('has-art');
+    prevSrc = p._src;
+    b.style.setProperty('--c', cvar(p.theme)); b.style.setProperty('--i', Math.min(i, 40));
+    b.addEventListener('click', function(){ goTo(p.id); });
+    pile.appendChild(b); squares[p.id] = b;
+  });
+
+  // ---------- まず読む3件 ----------
+  var picks = document.getElementById('picks');
+  (D.picks || []).forEach(function(id){
+    var p = byId[id]; if (!p) return;
+    var a = el('a', {'class': 'pick', 'href': '#item-' + p.id});
+    a.style.setProperty('--c', cvar(p.theme));
+    var body = el('div');
+    body.appendChild(el('strong', null, p.title));
+    var who = p._src === 'bookmarks' ? '@' + p.handle : (p._src === 'blogs' ? p.company_label + ' ' + p.blog : SRC[p._src]);
+    body.appendChild(el('span', null, (tName[p.theme] || '') + '／' + who + (readMin(p) ? '／約' + readMin(p) + '分' : '')));
+    a.appendChild(body);
+    a.addEventListener('click', function(e){ e.preventDefault(); goTo(p.id); });
+    picks.appendChild(a);
+  });
+  if (!picks.children.length) document.getElementById('picks-sec').hidden = true;
+
+  // ---------- 図解 ----------
+  var pending = [];
+  var io = ('IntersectionObserver' in window && !reduced) ? new IntersectionObserver(function(es){
+    es.forEach(function(e){ if (e.isIntersecting) { reveal(e.target); io.unobserve(e.target); } });
+  }, { threshold: 0.35 }) : null;
+  function reveal(v){ v.classList.remove('wait'); if (v._onIn) v._onIn(); }
+  // 読み込んだ直後の画面に入っている図解はそのまま見せ、画面の外の図解だけを見えたときに動かす
+  function watch(v){ if (io) { pending.push(v); } }
+  function startWatching(){
+    pending.forEach(function(v){
+      var r = v.getBoundingClientRect();
+      if (r.top < window.innerHeight && r.bottom > 0) return;
+      v.classList.add('wait'); io.observe(v);
+    });
+  }
+  function num(x){ return typeof x === 'number' && isFinite(x); }
+
+  function renderVisual(v){
+    if (!v || !v.type) return null;
+    var box = el('div', {'class': 'viz', 'role': 'figure'});
+    if (v.label && v.type !== 'stat') box.appendChild(el('p', {'class': 'viz-label'}, v.label));
+    if (v.type === 'before_after' && v.before && v.after) {
+      if (num(v.before.value) && num(v.after.value)) {
+        var mx = Math.max(v.before.value, v.after.value) || 1, unit = v.unit || '';
+        [['before', v.before], ['after', v.after]].forEach(function(r){
+          var row = el('div', {'class': 'ba-row'});
+          row.appendChild(el('span', null, r[1].label || (r[0] === 'before' ? '前' : '後')));
+          var tr = el('div', {'class': 'ba-track'}), bar = el('div', {'class': 'ba-bar' + (r[0] === 'after' ? ' after' : '')});
+          bar.style.setProperty('--s', r[1].value / mx); tr.appendChild(bar); row.appendChild(tr);
+          row.appendChild(el('span', {'class': 'ba-val'}, fmt(r[1].value) + unit)); box.appendChild(row);
+        });
+        if (v.before.value) {
+          var pct = Math.round((v.after.value - v.before.value) / v.before.value * 100);
+          box.appendChild(el('p', {'class': 'ba-delta'}, fmt(v.before.value) + unit + ' から ' + fmt(v.after.value) + unit + '（' + (pct > 0 ? pct + '%増' : Math.abs(pct) + '%減') + '）'));
+        }
+      } else {
+        var g = el('div', {'class': 'ba-t'});
+        [['', v.before], ['after', v.after]].forEach(function(r, i){
+          var b = el('div', {'class': 'ba-box' + (r[0] ? ' after' : '')});
+          if (r[1].label) b.appendChild(el('small', null, r[1].label));
+          b.appendChild(document.createTextNode(r[1].text || ''));
+          g.appendChild(b);
+          if (i === 0) g.appendChild(el('span', {'class': 'ba-arrow', 'aria-hidden': 'true'}, '→'));
+        });
+        box.appendChild(g);
+      }
+    } else if (v.type === 'flow' && v.steps && v.steps.length) {
+      var ol = el('ol', {'class': 'flow'});
+      v.steps.forEach(function(s, i){
+        var li = el('li'); li.style.setProperty('--i', i);
+        if (i > 0) li.appendChild(el('span', {'class': 'arrow', 'aria-hidden': 'true'}, '→'));
+        li.appendChild(el('span', {'class': 'step'}, s)); ol.appendChild(li);
+      });
+      box.appendChild(ol);
+    } else if (v.type === 'options' && v.items && v.items.length) {
+      var gr = el('div', {'class': 'opts'});
+      v.items.forEach(function(it, i){
+        var o = el('div', {'class': 'opt'}); o.style.setProperty('--i', i);
+        o.appendChild(el('b', null, it.name)); if (it.note) o.appendChild(el('span', null, it.note));
+        gr.appendChild(o);
+      });
+      box.appendChild(gr);
+    } else if (v.type === 'versus' && v.a && v.b) {
+      var vs = el('div', {'class': 'vs'});
+      [['a', v.a], ['b', v.b]].forEach(function(s, i){
+        var win = v.winner === s[0], side = el('div', {'class': 'side' + (v.winner ? (win ? ' win' : ' lose') : '')});
+        if (win) side.appendChild(el('span', {'class': 'badge'}, '有利'));
+        side.appendChild(el('b', null, s[1].label)); if (s[1].note) side.appendChild(el('span', null, s[1].note));
+        vs.appendChild(side);
+        if (i === 0) vs.appendChild(el('span', {'class': 'vs-mid'}, 'vs'));
+      });
+      box.appendChild(vs);
+      if (v.caption) box.appendChild(el('p', {'class': 'vs-cap'}, v.caption));
+    } else if (v.type === 'stat' && num(v.value)) {
+      var st = el('div', {'class': 'stat'}), nb = el('span', {'class': 'num'}, fmt(v.value));
+      var wrap = el('span'); wrap.appendChild(nb); if (v.unit) wrap.appendChild(el('span', {'class': 'unit'}, v.unit));
+      st.appendChild(wrap); if (v.label) st.appendChild(el('span', {'class': 'lab'}, v.label));
+      box.appendChild(st);
+      if (io) {
+        box._onIn = function(){
+          var t0 = null, target = v.value, dec = String(target).split('.')[1] ? 1 : 0;
+          function step(ts){ if (!t0) t0 = ts; var k = Math.min(1, (ts - t0) / 800), e = 1 - Math.pow(1 - k, 3);
+            nb.textContent = dec ? (target * e).toFixed(dec) : fmt(Math.round(target * e)); if (k < 1) requestAnimationFrame(step); }
+          requestAnimationFrame(step);
+        };
+      }
+    } else return null;
+    return box;
+  }
+
+  // ---------- 項目の共通部品 ----------
+  var itemEls = {}, kwBtns = [], groups = [];
+  function keywordsEl(p){
+    if (!p.keywords || !p.keywords.length) return null;
+    var kws = el('div', {'class': 'kws'});
+    p.keywords.forEach(function(k){
+      var b = el('button', {'class': 'kw', 'type': 'button'}, k); b._k = k;
+      b.addEventListener('click', function(){ setKeyword(k); });
+      kws.appendChild(b); kwBtns.push(b);
+    });
+    return kws;
+  }
+  function readButton(p){
+    var rb = el('button', {'class': 'readbtn', 'type': 'button', 'aria-pressed': 'false'}, '既読にする');
+    rb.addEventListener('click', function(){ if (read[p.id]) delete read[p.id]; else read[p.id] = 1; saveRead(); apply(); });
+    return rb;
+  }
+  function register(p, node, rb){ node._rb = rb; itemEls[p.id] = node; node.style.setProperty('--c', cvar(p.theme)); }
+  function points(p){
+    if (!p.points || !p.points.length) return null;
+    var ul = el('ul'); p.points.forEach(function(pt){ ul.appendChild(el('li', null, pt)); }); return ul;
+  }
+  var FETCH_FLAG = {partial: '本文の一部のみ', blocked: '本文未取得', error: '本文未取得'};
+
+  // ---------- ブックマーク ----------
+  function renderPost(p){
+    var a = el('article', {'class': 'item', 'id': 'item-' + p.id});
+    var who = el('p', {'class': 'who'});
+    who.appendChild(el('span', null, (p.author || '') + '  @' + (p.handle || '')));
+    a.appendChild(who);
+    a.appendChild(el('h4', null, p.title));
+    if (p.article) {
+      var r = el('div', {'class': 'ref'});
+      r.appendChild(el('small', null, '記事'));
+      r.appendChild(el('span', {'class': 'r-title'}, p.article.title || p.article.domain || ''));
+      var m = el('span', {'class': 'r-meta'});
+      m.appendChild(el('span', null, p.article.domain || ''));
+      if (FETCH_FLAG[p.article.fetch_status]) m.appendChild(el('span', {'class': 'flag'}, FETCH_FLAG[p.article.fetch_status]));
+      if (safeUrl(p.article.url)) m.appendChild(link(p.article.url, '記事を開く'));
+      r.appendChild(m); a.appendChild(r);
+    }
+    if (p.quoted) {
+      var q = el('div', {'class': 'ref quote'});
+      q.appendChild(el('small', null, '引用元  ' + (p.quoted.author || '') + (p.quoted.handle ? '  @' + p.quoted.handle : '')));
+      q.appendChild(el('span', null, p.quoted.claim || ''));
+      if (safeUrl(p.quoted.url)) { var qm = el('span', {'class': 'r-meta'}); qm.appendChild(link(p.quoted.url, '引用元を開く')); q.appendChild(qm); }
+      a.appendChild(q);
+    }
+    var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
+    var ul = points(p); if (ul) a.appendChild(ul);
+    if (p.comment) {
+      var c = el('div', {'class': 'comment'});
+      c.appendChild(el('small', null, '@' + (p.handle || '') + ' のコメント'));
+      c.appendChild(document.createTextNode(p.comment));
+      a.appendChild(c);
+    }
+    var kws = keywordsEl(p); if (kws) a.appendChild(kws);
+    var f = el('div', {'class': 'foot'});
+    if (p.importance >= 3) f.appendChild(el('span', {'class': 'must'}, '必読'));
+    f.appendChild(el('span', null, '約' + (p.read_min || 1) + '分'));
+    if (safeUrl(p.url)) f.appendChild(link(p.url, 'Xで開く'));
+    var rb = readButton(p); f.appendChild(rb); a.appendChild(f);
+    register(p, a, rb);
+    return a;
+  }
+  var bmWrap = document.getElementById('bookmarks'), posts = D.posts || [];
+  document.getElementById('n-bookmarks').textContent = posts.length + '件';
+  themeIds.forEach(function(id){
+    var list = posts.filter(function(p){ return p.theme === id; });
+    if (!list.length) return;
+    var g = el('div', {'class': 'group'}); g.style.setProperty('--c', cvar(id));
+    var head = el('div', {'class': 'theme-head'});
+    head.appendChild(el('h3', null, tName[id])); head.appendChild(el('span', {'class': 'n'}, list.length + '件'));
+    g.appendChild(head);
+    var th = (D.themes || []).filter(function(t){ return t.id === id; })[0];
+    if (th && th.summary) g.appendChild(el('p', {'class': 'theme-sum'}, th.summary));
+    list.forEach(function(p){ g.appendChild(renderPost(p)); });
+    g._list = list; groups.push(g); bmWrap.appendChild(g);
+  });
+  var bst = statusBy.bookmarks;
+  if (bst && bst.status === 'error') { var fb = document.getElementById('fail-bookmarks'); fb.hidden = false; fb.textContent = 'ブックマークを取得できませんでした。' + (bst.message || ''); }
+  else if (!posts.length) bmWrap.appendChild(el('p', {'class': 'sub'}, '新着のブックマークはありません。'));
+
+  // ---------- 公式テックブログ ----------
+  var blogWrap = document.getElementById('blogs'), blogs = D.blogs || [];
+  document.getElementById('n-blogs').textContent = blogs.length + '件';
+  var companies = D.blog_companies || [];
+  if (!companies.length) blogs.forEach(function(b){ if (!companies.some(function(c){ return c.company === b.company; })) companies.push({company: b.company, label: b.company_label, status: 'ok'}); });
+  companies.forEach(function(c){
+    var box = el('div', {'class': 'company', 'id': 'company-' + c.company});
+    box.appendChild(el('h3', null, c.label || c.company));
+    var list = blogs.filter(function(b){ return b.company === c.company; });
+    if (!list.length) {
+      box.appendChild(el('p', {'class': 'none' + (c.status === 'error' ? ' err' : '')}, c.status === 'error' ? '取得失敗' : '更新なし'));
+    }
+    list.forEach(function(p){
+      var a = el('article', {'class': 'item', 'id': 'item-' + p.id});
+      var who = el('p', {'class': 'who'});
+      var dot = el('span', {'class': 'tdot', 'aria-hidden': 'true'}); who.appendChild(dot);
+      who.appendChild(el('span', null, p.blog + '・' + (tName[p.theme] || '')));
+      a.appendChild(who);
+      a.appendChild(el('h4', null, p.title));
+      var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
+      var ul = points(p); if (ul) a.appendChild(ul);
+      var kws = keywordsEl(p); if (kws) a.appendChild(kws);
+      var f = el('div', {'class': 'foot'});
+      if (p.importance >= 3) f.appendChild(el('span', {'class': 'must'}, '必読'));
+      if (p.read_min) f.appendChild(el('span', null, '約' + p.read_min + '分'));
+      if (safeUrl(p.url)) f.appendChild(link(p.url, '記事を開く'));
+      var rb = readButton(p); f.appendChild(rb); a.appendChild(f);
+      register(p, a, rb); box.appendChild(a);
+    });
+    box._list = list; groups.push(box); blogWrap.appendChild(box);
+  });
+  if (!companies.length) blogWrap.appendChild(el('p', {'class': 'sub'}, '新着はありません。'));
+
+  // ---------- GitHubトレンド ----------
+  var gh = D.github || [], ghList = document.getElementById('github');
+  var gst = statusBy.github;
+  if (gst && gst.status === 'error') { var fg = document.getElementById('fail-github'); fg.hidden = false; fg.textContent = '取得失敗' + (gst.message ? '：' + gst.message : ''); }
+  if (gst && gst.note) { var ng = document.getElementById('note-github'); ng.hidden = false; ng.textContent = gst.note; }
+  var ghMax = Math.max.apply(null, gh.map(function(r){ return r.stars_today || 0; }).concat([1]));
+  gh.forEach(function(p){
+    var li = el('li', {'class': 'item', 'id': 'item-' + p.id});
+    li.appendChild(el('span', {'class': 'rank'}, p.rank));
+    var body = el('div');
+    var t = el('div', {'class': 'rt'}); t.appendChild(link(p.url, p.title)); body.appendChild(t);
+    if (num(p.stars_today)) {
+      var bar = el('div', {'class': 'gbar'}), tr = el('div', {'class': 'track'}), fill = el('div', {'class': 'fill'});
+      fill.style.setProperty('--s', p.stars_today / ghMax); tr.appendChild(fill); bar.appendChild(tr);
+      bar.appendChild(el('span', {'class': 'v'}, '+' + fmt(p.stars_today))); body.appendChild(bar);
+    }
+    if (p.summary) body.appendChild(el('p', {'class': 'gsum'}, p.summary));
+    var m = el('div', {'class': 'gmeta'});
+    m.appendChild(el('span', {'class': 'tdot', 'aria-hidden': 'true'}));
+    m.appendChild(el('span', null, tName[p.theme] || ''));
+    if (p.language) m.appendChild(el('span', null, p.language));
+    if (num(p.stars_total)) m.appendChild(el('span', null, '★' + fmt(p.stars_total)));
+    if (p.streak_days >= 2) m.appendChild(el('span', {'class': 'streak'}, '連続' + p.streak_days + '日目'));
+    body.appendChild(m);
+    li.appendChild(body);
+    var vz = renderVisual(p.visual); if (vz) { li.appendChild(vz); vz.style.gridColumn = '2'; watch(vz); }
+    var f = el('div', {'class': 'foot'}); var rb = readButton(p); f.appendChild(rb); li.appendChild(f);
+    register(p, li, rb); ghList.appendChild(li);
+  });
+  if (!gh.length && !(gst && gst.status === 'error')) ghList.appendChild(el('li', {'class': 'sub'}, '今日のデータはありません。'));
+  var ghGroup = document.getElementById('sec-github'); ghGroup._list = gh; groups.push(ghGroup);
+
+  // ---------- Qiita・Zenn・DevelopersIO ----------
+  var cols = document.getElementById('cols');
+  ['qiita', 'zenn', 'devio'].forEach(function(site){
+    var list = (D.articles || []).filter(function(a){ return a.site === site; }).sort(function(a, b){ return a.rank - b.rank; });
+    var col = el('div', {'class': 'col', 'id': 'col-' + site});
+    col.appendChild(el('h3', null, SRC[site]));
+    var st = statusBy[site];
+    if (st && st.status === 'error') col.appendChild(el('p', {'class': 'fail'}, '取得失敗' + (st.message ? '：' + st.message : '')));
+    else if (!list.length) col.appendChild(el('p', {'class': 'sub'}, '今日のデータはありません。'));
+    var ol = el('ol');
+    list.forEach(function(p){
+      var li = el('li', {'class': 'item', 'id': 'item-' + p.id});
+      li.appendChild(el('span', {'class': 'rank'}, p.rank));
+      var body = el('div');
+      var t = el('div', {'class': 'rt'}); t.appendChild(link(p.url, p.title)); body.appendChild(t);
+      if (p.summary) body.appendChild(el('p', {'class': 'gsum'}, p.summary));
+      var m = el('div', {'class': 'gmeta'});
+      m.appendChild(el('span', {'class': 'tdot', 'aria-hidden': 'true'}));
+      m.appendChild(el('span', null, tName[p.theme] || ''));
+      if (num(p.likes)) m.appendChild(el('span', null, '♥' + fmt(p.likes)));
+      if (p.streak_days >= 2) m.appendChild(el('span', {'class': 'streak'}, '連続' + p.streak_days + '日目'));
+      body.appendChild(m); li.appendChild(body);
+      var vz = renderVisual(p.visual); if (vz) { li.appendChild(vz); watch(vz); }
+      var f = el('div', {'class': 'foot'}); var rb = readButton(p); f.appendChild(rb); li.appendChild(f);
+      register(p, li, rb); ol.appendChild(li);
+    });
+    col.appendChild(ol); col._list = list; groups.push(col); cols.appendChild(col);
+  });
+
+  // ---------- 推移グラフ ----------
+  var tr = D.trend || [], tsvg = document.getElementById('trend');
+  if (tr.length) {
+    var max = Math.max.apply(null, tr.map(function(d){ return d.count; })) || 1;
+    var sum = tr.reduce(function(s,d){ return s + d.count; }, 0);
+    document.getElementById('trend-sub').textContent = '直近' + tr.length + '日間で' + sum + '件。1日平均' + (sum / tr.length).toFixed(1) + '件です。';
+    var TW = 640, TH = 170, top = 22, bottom = 26, gap = 8, bw = (TW - gap * (tr.length - 1)) / tr.length, ch = TH - top - bottom;
+    tr.forEach(function(d, i){
+      var h = Math.max(2, d.count / max * ch), x = i * (bw + gap), y = top + ch - h, last = i === tr.length - 1;
+      var r = sv('rect', { x: x, y: y, width: bw, height: h, rx: 3, 'class': 'bar' + (last ? ' today' : '') });
+      r.appendChild(sv('title', null, d.date + '：' + d.count + '件')); tsvg.appendChild(r);
+      if (last || d.count === max) tsvg.appendChild(sv('text', { x: x + bw / 2, y: y - 6, 'text-anchor': 'middle', 'class': 'val' }, d.count));
+      if (i === 0 || last) {
+        var md = d.date.split('-');
+        tsvg.appendChild(sv('text', { x: last ? x + bw : x, y: TH - 6, 'text-anchor': last ? 'end' : 'start', 'class': 'lbl' }, last ? '今日' : Number(md[1]) + '/' + Number(md[2])));
+      }
+    });
+  }
+
+  // ---------- 除外した項目 ----------
+  var ex = D.excluded || [], exList = document.getElementById('excl-list');
+  document.getElementById('excl-n').textContent = ex.length + '件';
+  if (!ex.length) document.getElementById('excl').hidden = true;
+  var EX_SRC = {bookmark: 'ブックマーク', qiita: 'Qiita', zenn: 'Zenn'};
+  ex.forEach(function(x){
+    var li = el('li');
+    li.appendChild(el('small', null, EX_SRC[x.source] || x.source));
+    li.appendChild(safeUrl(x.url) ? link(x.url, x.title) : el('span', null, x.title));
+    li.appendChild(el('span', {'class': 'p'}, num(x.tech_prob) ? x.tech_prob.toFixed(2) : '—'));
+    exList.appendChild(li);
+  });
+
+  // ---------- 絞り込みの反映 ----------
+  function matches(p){
+    if (state.theme && p.theme !== state.theme) return false;
+    if (state.keyword && (p.keywords || []).indexOf(state.keyword) < 0) return false;
+    if (state.source && p._src !== state.source) return false;
+    return true;
+  }
+  var SECTIONS = [['sec-bookmarks', ['bookmarks']], ['sec-blogs', ['blogs']], ['sec-trends', ['github', 'qiita', 'zenn', 'devio']]];
+  function apply(){
+    var noFilter = !state.theme && !state.keyword;
+    allChip.setAttribute('aria-pressed', String(noFilter));
+    Array.prototype.forEach.call(chips.children, function(c){ if (c._theme) c.setAttribute('aria-pressed', String(state.theme === c._theme)); });
+    srcBtns.forEach(function(b){ b.setAttribute('aria-pressed', String(state.source === b._src)); });
+    kwChip.hidden = !state.keyword;
+    if (state.keyword) kwChip.textContent = '「' + state.keyword + '」で絞り込み中　解除';
+    unreadBtn.setAttribute('aria-pressed', String(state.unread));
+    kwBtns.forEach(function(b){ b.classList.toggle('on', b._k === state.keyword); });
+
+    Object.keys(mapEls.kw).forEach(function(k){
+      var m = mapEls.kw[k];
+      if (m.fb) { m.fb.classList.toggle('on', k === state.keyword); return; }
+      m.g.classList.toggle('on', k === state.keyword);
+      var dim = (state.keyword && k !== state.keyword) || (state.theme && m.themes.indexOf(state.theme) < 0);
+      m.g.classList.toggle('dim', !!dim);
+    });
+    Object.keys(mapEls.theme).forEach(function(id){
+      var kw = state.keyword && mapEls.kw[state.keyword];
+      var dim = (state.theme && id !== state.theme) || (kw && kw.themes && kw.themes.indexOf(id) < 0);
+      mapEls.theme[id].classList.toggle('dim', !!dim);
+    });
+    mapEls.links.forEach(function(l){
+      var dim = (state.theme && l.theme !== state.theme) || (state.keyword && l.kw !== state.keyword);
+      l.el.classList.toggle('dim', !!dim);
+    });
+
+    var shown = 0, filtering = state.theme || state.keyword || state.source || state.unread;
+    items.forEach(function(p){
+      var isRead = !!read[p.id], match = matches(p), sq = squares[p.id], pe = itemEls[p.id];
+      if (sq) { sq.classList.toggle('read', isRead); sq.classList.toggle('dim', !match); }
+      if (pe) {
+        pe.classList.toggle('is-read', isRead);
+        pe._rb.setAttribute('aria-pressed', String(isRead));
+        pe._rb.textContent = isRead ? '既読' : '既読にする';
+        var vis = match && !(state.unread && isRead);
+        pe.hidden = !vis; if (vis) shown++;
+      }
+    });
+    // 絞り込み中は、該当がなくなったまとまりを隠す（「更新なし」の表示も絞り込み中は出さない）
+    groups.forEach(function(g){ g.hidden = filtering && !g._list.some(function(p){ return !itemEls[p.id].hidden; }); });
+    SECTIONS.forEach(function(s){
+      var sec = document.getElementById(s[0]);
+      sec.hidden = filtering && !items.some(function(p){ return s[1].indexOf(p._src) >= 0 && !itemEls[p.id].hidden; });
+    });
+    document.getElementById('empty').hidden = shown > 0 || !items.length;
+  }
+
+  function goTo(id){
+    var pe = itemEls[id]; if (!pe) return;
+    if (pe.hidden) { state.theme = null; state.keyword = null; state.source = null; state.unread = false; apply(); }
+    pe.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+    if (!reduced) { pe.classList.remove('flash'); void pe.offsetWidth; pe.classList.add('flash'); }
+  }
+
+  if (D.generated_at) {
+    var gd = new Date(D.generated_at);
+    if (!isNaN(gd)) document.getElementById('footer').textContent = (gd.getMonth()+1) + '月' + gd.getDate() + '日 ' + gd.getHours() + ':' + String(gd.getMinutes()).padStart(2,'0') + ' に生成。既読の記録はこの端末のブラウザにだけ保存されます。';
+  }
+
+  renderMap(); apply(); startWatching();
+  var rt; window.addEventListener('resize', function(){ clearTimeout(rt); rt = setTimeout(function(){ renderMap(); apply(); }, 200); });
+})();
+</script>

@@ -1,0 +1,18 @@
+{
+  "_note": "トピック一覧（固定）。IDと並び順は日をまたいで変えない。レポートの色は並び順で決まる。見直しは手動で行う。",
+  "topics": [
+    {"id": "llm_agents", "name": "LLM・AIエージェント", "description": "Large language models, AI agents, coding agents, prompts, MCP and tool use, AI products built on LLMs"},
+    {"id": "ml_data", "name": "機械学習・データサイエンス", "description": "Machine learning other than LLM applications: training, models, research papers, data analysis, statistics"},
+    {"id": "frontend", "name": "Web・フロントエンド", "description": "Web front-end: browsers, HTML/CSS, JavaScript/TypeScript, UI frameworks such as React"},
+    {"id": "backend", "name": "バックエンド・API", "description": "Server-side development: APIs, web frameworks, server languages, architecture and design of services"},
+    {"id": "cloud_infra", "name": "クラウド・インフラ", "description": "Cloud services (AWS, Google Cloud, Azure), servers, networks, containers, Kubernetes"},
+    {"id": "devops", "name": "DevOps・CI/CD", "description": "CI/CD, deployment, monitoring and observability, SRE, incident response, infrastructure as code"},
+    {"id": "security", "name": "セキュリティ", "description": "Vulnerabilities, attacks, authentication, cryptography, secure development"},
+    {"id": "database", "name": "データベース・データ基盤", "description": "Databases, SQL, data warehouses, data pipelines, data engineering"},
+    {"id": "mobile", "name": "モバイル", "description": "iOS and Android app development, mobile devices"},
+    {"id": "devtools", "name": "開発ツール・エディタ", "description": "Editors, IDEs, terminals, Git, CLIs, programming languages and libraries as developer tools, developer productivity"},
+    {"id": "product_ux", "name": "プロダクト・UX", "description": "Product management, UX and UI design, product decisions, user research"},
+    {"id": "career", "name": "キャリア・組織", "description": "Engineering careers, hiring, team management, organization and culture, learning"},
+    {"id": "other", "name": "その他", "description": "None of the above"}
+  ]
+}

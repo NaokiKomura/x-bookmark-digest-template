@@ -1,0 +1,82 @@
+name: fetch
+
+# 取得と判定（毎朝 6:00 JST）。要約は 7:00 JST の Claude のルーチンが行う。
+# X、外部サイト、TypeSafe AI に接続するのはこのワークフローだけ。
+on:
+  schedule:
+    - cron: "0 21 * * *" # 毎日 06:00 JST
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "データの日付（YYYY-MM-DD、空なら今日の日本時間）"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    # リポジトリ変数 DIGEST_ENABLED を true にしたリポジトリでだけ動く。
+    # テンプレート自身や、作った直後で Secrets がまだないリポジトリでは実行しない。
+    if: vars.DIGEST_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DIGEST_DATE: ${{ inputs.date }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - run: uv sync --frozen --no-dev
+
+      # 1〜2. トークン更新（書き戻しに失敗したらここで止まる）とブックマーク取得
+      - name: fetch bookmarks
+        id: bookmarks
+        env:
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN: ${{ secrets.X_REFRESH_TOKEN }}
+          X_USER_ID: ${{ secrets.X_USER_ID }}
+          GH_PAT: ${{ secrets.GH_PAT }}
+        run: uv run python -m scripts.fetch_bookmarks
+
+      # 3. 追加の情報源（失敗した情報源は記録して続ける）
+      - name: fetch sources
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run python -m scripts.fetch_sources
+
+      # 4. 本文の取得
+      - name: fetch articles
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run python -m scripts.fetch_articles
+
+      # 5. Jev で判定（応答しなければ unavailable として保存し、ルーチンが代わりに判定する）
+      - name: classify with Jev
+        env:
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+        run: uv run python -m scripts.classify_jev
+
+      # 6. 保存とコミット（新着が0件でも空のファイルを置く）
+      - name: commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add data state
+          if git diff --cached --quiet; then
+            echo "nothing to commit"
+          else
+            git commit -m "data: $(TZ=Asia/Tokyo date +%F)"
+            git push
+          fi
+
+      - name: fail if bookmarks could not be fetched
+        if: steps.bookmarks.outputs.bookmarks_error == '1'
+        run: |
+          echo "::error::ブックマークの取得に失敗しました（追加の情報源は保存済み）。ログを確認してください。"
+          exit 1
