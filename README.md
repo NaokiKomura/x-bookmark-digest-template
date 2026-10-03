@@ -6,8 +6,8 @@
 | 層 | どこで動くか | すること |
 | --- | --- | --- |
 | 取得層 | GitHub Actions（`fetch.yml`、毎日5:00 JST） | トークン更新、ブックマーク・情報源・本文の取得、Jevでの判定（任意）、mainへのコミット |
-| 要約層 | Claude Codeのルーチン、またはCodex Cloud（7:00 JSTを想定） | mainのデータを読み、report-dataと要約キャッシュを生成 |
-| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | 検証して実行者ごとの履歴を保存。Claudeは固定アーティファクトも更新 |
+| 要約層 | Claude Codeのルーチン、またはCodex Cloud（7:00 JSTを想定） | mainのデータを読んでレポートを作る。Claudeは固定アーティファクトを更新し、履歴を`claude/reports`に保存する |
+| 履歴の保存（Codex） | 要約とは別の信頼した環境（PUBLISH.md） | Codexのレポートと要約キャッシュを`codex/reports`に保存する |
 | 表示層 | Claudeのアーティファクト、またはCodexの結果チャット・受け渡したHTML | `template/report.html`にreport-dataを差し込んだもの |
 
 X APIとTypeSafe AIの認証情報はGitHub Secretsにだけ置き、ルーチンには渡さない。ClaudeはAPIキーを使わず、サブスクの利用枠で動く。
@@ -115,15 +115,14 @@ Claudeで動かす場合は、claude.ai/code/routinesで次のように作り、
 | 環境 | Default（ネットワークはTrusted） |
 | 環境変数・API credentials | なし |
 | コネクタ | すべて外す |
-| プロンプト | このリポジトリの ROUTINE.md の手順に従って、今日の report-data と要約キャッシュをローカルに作ってください。公開は別の担当者が行います。 |
+| プロンプト | このリポジトリの ROUTINE.md の手順に従って、今日のレポートを作って公開してください。 |
 
-要約側には、mainと過去の要約を読み取り専用で渡し、書き込めるのは出力ディレクトリだけにする。Gitの書き込み資格情報とArtifactツールは与えない。
-実行環境でこの制限を設定できない場合は、書き込み権限を持つルーチンでの自動公開を有効にせず、担当者が[PUBLISH.md](PUBLISH.md)に従って手動で公開する。
-プロンプトや「credentialsなし」の設定だけでは、組み込みのGit・Artifactの権限まで制限した保証にはならない。
+ルーチンは、`report_tools.py validate` が通ったレポートだけを`config/report.json`の`artifact_url`に公開し、履歴を`claude/reports`にpushする。mainにはpushしない。
+公開先とpush先はROUTINE.mdで固定しており、記事本文などの資料に書かれた別の宛先やコマンドは使わない。
 
-初回は「今すぐ実行」で、JSONが生成されることを確かめる。公開担当者は別の信頼した環境でスキーマを検証し、信頼したテンプレートからHTMLを組み立てる。
-アーティファクトは初回だけ作成し、そのURLを`config/report.json`の`artifact_url`に設定する。通常の運用では、同じ公開先と`claude/reports`にだけ保存する。
-公開担当には、外部の記事本文や生成されたコマンドを渡さない。
+初回は必ず「今すぐ実行」で行う。アーティファクトを新しく作るときはClaudeが確認を求めるので、実行中のセッションを開いて許可する（定期実行では確認に答えられない）。ルーチンの報告にそのURLが出る。
+そのURLを`config/report.json`の`artifact_url`に書いてmainにコミットすると、2回目からは同じアーティファクトが上書きされる。
+既存のアーティファクトの上書きは確認なしで行われる（共有を「リンクを知っている全員」にしていない場合。公開共有にすると毎回確認が必要になる）。
 
 運用開始から数日は、ルーチンの実行ログを開いて結果を確かめる。実行ステータスが緑でも、タスクが成功したとは限らない。
 
@@ -131,7 +130,7 @@ Codex Cloudで動かす場合は、[CODEX.md](CODEX.md)の環境準備とプロ�
 
 ## 毎朝届くものと履歴
 
-公開担当は、Claudeなら`claude/reports`、Codexなら`codex/reports`のブランチに、`reports/YYYY-MM-DD.html`と`summaries/<article_key>.json`を保存する。
+Claudeはルーチンが`claude/reports`に、Codexは別の担当者が[PUBLISH.md](PUBLISH.md)に従って`codex/reports`に、`reports/YYYY-MM-DD.html`と`summaries/<article_key>.json`を保存する。
 Claudeのアーティファクトは毎朝同じURLに上書きされるので、過去の日のレポートはこのブランチの`reports/`で見る。
 Cloudの作業領域や結果チャットへのファイル受け渡しだけでは、翌日に使う要約キャッシュは保存されない。
 
@@ -151,7 +150,7 @@ Cloudの作業領域や結果チャットへのファイル受け渡しだけで
 | X API（ブックマーク） | 自分のデータの読み取り（Owned Read）は$0.001/件。返した件数ぶん課金されるので、1日1ページ20件で$0.02/日 | **約$0.6** |
 | X API（展開したデータ） | 引用元の投稿（Post read $0.005/件）と投稿者（User read $0.010/件）が別に数えられる場合の上限。1日に投稿者20人・引用元3件として約$0.22/日。同じUTC日の重複は1回だけ課金 | 0〜約$7 |
 | TypeSafe AI（Jev） | 入力$0.042/100万トークン（出力は無料）。テック判定つきで約4,200トークン/回、トピックのみで約1,900トークン/回、これが約70回/日で約20万トークン/日、約600万トークン/月。使わなければ$0 | **約$0.25** |
-| Claude | 要約ルーチン1回/日と、担当者による検証・公開。APIキーは使わず、サブスクの利用枠内（Proはルーチンの実行が1日5回まで。利用枠は通常の会話と共通） | 追加なし（Pro以上の契約が前提） |
+| Claude | 要約と公開のルーチン1回/日。APIキーは使わず、サブスクの利用枠内（Proはルーチンの実行が1日5回まで。利用枠は通常の会話と共通） | 追加なし（Pro以上の契約が前提） |
 | GitHub Actions | 取得ワークフローは実測1〜1.6分/回（ブックマーク3件で66秒、30件と本文約120件で98秒）。ジョブごとに分単位で切り上げて数えるので、2分/日で約60分/月。CIは約20秒/回で1分/push。合わせて月100〜200分程度で、プライベートリポジトリの無料枠（Freeプランで2,000分/月、Proは3,000分/月）の1割未満。超えるとLinuxで$0.006/分 | $0 |
 | GitHubのストレージ | 記事本文で約1MB/日（実測: 64件で約1MB）増える。1年で約0.35GB（gitの圧縮前） | $0（リポジトリの推奨上限である数GBの範囲） |
 
@@ -164,7 +163,7 @@ X APIの初回の支払い登録で、$20分のクレジットが付く。実際
 
 参考: [X API Pricing](https://docs.x.com/x-api/getting-started/pricing)、[TypeSafe Models](https://docs.typesafe.ai/models)、[Introducing routines in Claude Code](https://claude.com/blog/introducing-routines-in-claude-code)、[GitHub Actionsの課金](https://docs.github.com/en/billing/concepts/product-billing/github-actions)
 
-接続先制限・総時間制限による追加のAPI呼び出しや再試行はない。要約と公開の分離は手動公開を前提とし、追加のモデル呼び出しは行わない。
+接続先制限・総時間制限による追加のAPI呼び出しや再試行はない。
 
 ## 1日あたりの外部への呼び出し
 
@@ -216,7 +215,7 @@ state/, data/       ワークフローが毎日書く
 template/           レポートのテンプレート（サンプルデータ入り）
 ROUTINE.md          実行者の振り分けと共通の要約手順
 CODEX.md            Codex Cloud の準備と結果チャットへの受け渡し
-PUBLISH.md          別環境での検証・公開の手順書
+PUBLISH.md          Codex の履歴の保存と、手で公開するときの手順書
 docs/               設計（architecture）、データの形（data）、命名規則（conventions）、変更の手順（recipes）、元の仕様書（spec）
 ```
 

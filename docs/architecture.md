@@ -5,13 +5,23 @@
 | 層 | 実行場所 | 外部との通信 | 秘密情報 | 書くもの |
 | --- | --- | --- | --- | --- |
 | 取得層 | GitHub Actions（`.github/workflows/fetch.yml`、5:00 JST） | X API、各サイト、GitHub API、TypeSafe AI（キーがあるときだけ） | X・TypeSafe・GH_PAT（Secrets） | main の `data/`、`state/` |
-| 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | なし（入力を読み取り専用で渡す） | なし | ローカルのreport-dataと要約キャッシュ |
-| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | Git・Artifactのみ | 公開先だけの権限 | Claude: 固定アーティファクトと `claude/reports`。Codex: `codex/reports` |
+| 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | 外部サイトなし。Claude は Git（`claude/reports` への push）と Artifact だけ | なし | Claude: 固定アーティファクトと `claude/reports`。Codex: 結果チャット |
+| 履歴の保存（Codex） | 要約とは別の信頼した環境（PUBLISH.md） | Git のみ | `codex/reports` への書き込み | `codex/reports` |
 | 表示層 | Claude のアーティファクト、または Codex の結果チャット・HTMLファイル | cdnjs の d3 だけ | なし | 閲覧者のブラウザの localStorage（既読） |
 
 この分け方の理由: 外部の文章（記事本文など）には Claude への指示が紛れ込みうる。要約層からコネクタと秘密情報を外すことで、操作可能な範囲を狭める。
-ただしプロンプトだけでは権限を制限できず、Git・Artifactの書き込み権限があれば不正な更新のリスクが残る。
-要約と公開を別環境に分け、要約側を読み取り専用にし、公開側の書き込み先を環境側で固定する。記事の取得を取得層で済ませておくので、ルーチンはネットワーク設定を初期状態のまま使える。
+記事の取得を取得層で済ませておくので、ルーチンはネットワーク設定を初期状態のまま使える。
+
+Claude のルーチンは、毎朝ひとりで公開まで終えるために、Artifact ツールと `claude/reports` への push の権限を持つ。
+claude.ai のルーチンには、要約と公開を別の環境に分ける仕組みがないためである。この権限が悪用されたときの影響を、次の決まりで狭める。
+
+- 公開先は main の `config/report.json` の `artifact_url`、push 先は `claude/reports` だけに ROUTINE.md で固定する。資料や生成したJSONにある別の宛先は使わない。
+- `report_tools.py validate` が `OK` を返したHTMLだけを公開する。HTMLはテンプレートの report-data ブロックだけが違うことを検証するので、スクリプトや外部の読み込みは足せない。
+- main には push しない。取得層のコードと設定は、ルーチンからは書き換わらない。
+- コネクタと秘密情報を渡さない。
+
+プロンプトによる決まりは権限そのものを制限しないので、資料に紛れた指示で誤った内容が公開されるおそれは残る。
+運用開始から数日はルーチンの実行ログを確かめ、気になるときは PUBLISH.md の手順で手で公開する運用に切り替える。
 
 ## 取得層の流れ
 
@@ -34,15 +44,11 @@
 1. `report_tools.py inputs` で当日の入力の有無と件数を確かめる
 2. `data/` を資料として読み、要約して report-data の JSON を作る
 3. `report_tools.py build` でテンプレートの report-data ブロックだけを差し替え、`validate` で検証する
-4. JSONを別の公開担当へ渡す。公開担当が信頼したテンプレートから組み立て直して検証し、
-   [PUBLISH.md](../PUBLISH.md) の固定した宛先へ公開・保存する
-
-生成側にはGit書き込み資格情報・Artifactツールを与えない。権限制限は実行環境側で設定する必要があり、
-このリポジトリの手順書だけでは強制できない。制限できない環境では担当者が手動で公開する。
+4. Claude は `config/report.json` の `artifact_url` に公開し、`reports/YYYY-MM-DD.html` と新しい要約を `claude/reports` に push する
 
 実行者は信頼したタスク設定で選ぶ。Codex は [CODEX.md](../CODEX.md) を入口とし、
 検証済みレポートを実行したタスクの結果チャットに渡す。ファイル受け渡し機能がなければ本文に要約を載せる。
-Claude の `artifact_url` は使わない。外部公開と履歴保存は引き続き別の公開担当が行う。
+Claude の `artifact_url` は使わない。Codex の履歴は別の担当者が [PUBLISH.md](../PUBLISH.md) に従って `codex/reports` に保存する。
 
 ランキングで前日にも載った項目は、Claude は `claude/reports`、Codex は `codex/reports` の `summaries/<article_key>.json` を再利用して利用枠を節約する。
 
