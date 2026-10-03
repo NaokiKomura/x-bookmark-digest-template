@@ -143,6 +143,15 @@ body:not(.v-overview) .group:first-child,body:not(.v-overview) .company:first-ch
 .who{font-size:13px;color:var(--ink3);margin:0 0 2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .tdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--c);flex:none}
 .item h4{font-size:17px;font-weight:500;line-height:1.6;margin:0 0 8px}
+.item.fold{padding:12px 0 14px}
+.item.fold h4{margin:0}
+.item-toggle{font:inherit;color:inherit;background:none;border:0;padding:0;margin:0;width:100%;cursor:pointer;text-align:left;display:flex;align-items:flex-start;gap:10px}
+.item-toggle>span{flex:1}
+.item-toggle::after{content:"";flex:none;width:7px;height:7px;margin:.6em 4px 0 0;border-right:2px solid var(--ink3);border-bottom:2px solid var(--ink3);transform:rotate(45deg);transition:transform .2s}
+.item.open .item-toggle::after{transform:rotate(-135deg);margin-top:.8em}
+.item-toggle:hover>span{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
+.item-meta{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:13px;color:var(--ink3);margin:4px 0 0}
+.item-body{padding-top:12px}
 .item.head-only{padding:10px 0 12px}
 .item.head-only h4{font-size:15px;margin:0 0 4px}
 .item ul{margin:0 0 10px;padding-left:1.2em;color:var(--ink2);font-size:15px}
@@ -1072,37 +1081,55 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var FETCH_FLAG = {partial: '本文の一部のみ', blocked: '本文未取得', error: '本文未取得'};
 
   // ---------- ブックマーク ----------
+  // カードは見出しだけを並べ、押すと中身を開く。必読（importance 3）は最初から開いておく
+  function makeCard(p, whoEl, metaBits, fill){
+    var a = el('article', {'class': 'item fold', 'id': 'item-' + p.id}), bid = 'body-' + p.id;
+    a.appendChild(whoEl);
+    var h = el('h4'), tg = el('button', {'type': 'button', 'class': 'item-toggle', 'aria-expanded': 'false', 'aria-controls': bid});
+    tg.appendChild(el('span', null, p.title)); h.appendChild(tg); a.appendChild(h);
+    var meta = el('p', {'class': 'item-meta'});
+    metaBits.forEach(function(m){ if (m) meta.appendChild(m); });
+    a.appendChild(meta);
+    var body = el('div', {'class': 'item-body', 'id': bid}); fill(body); a.appendChild(body);
+    tg.addEventListener('click', function(){ setOpen(a, !a._open); revealVisible(); });
+    a._tg = tg; a._body = body; setOpen(a, p.importance >= 3);
+    return a;
+  }
+  function setOpen(a, open){ a._open = open; a._tg.setAttribute('aria-expanded', String(open)); a._body.hidden = !open; a.classList.toggle('open', open); }
+  function foldAll(open){ items.forEach(function(p){ var pe = itemEls[p.id]; if (pe && pe._tg && !pe.hidden) setOpen(pe, open); }); revealVisible(); }
+  function mustEl(p){ return p.importance >= 3 ? el('span', {'class': 'must'}, '必読') : null; }
+  var KIND_LABEL = {article: '記事あり', quote: '引用', quote_article: '引用・記事あり'};
+
   function renderPost(p){
-    var a = el('article', {'class': 'item', 'id': 'item-' + p.id});
     var who = el('p', {'class': 'who'});
     who.appendChild(el('span', null, (p.author || '') + '  @' + (p.handle || '')));
-    a.appendChild(who);
-    a.appendChild(el('h4', null, p.title));
-    if (p.article) {
-      var r = el('div', {'class': 'ref'});
-      r.appendChild(el('small', null, '記事'));
-      r.appendChild(el('span', {'class': 'r-title'}, p.article.title || p.article.domain || ''));
-      var m = el('span', {'class': 'r-meta'});
-      m.appendChild(el('span', null, p.article.domain || ''));
-      if (FETCH_FLAG[p.article.fetch_status]) m.appendChild(el('span', {'class': 'flag'}, FETCH_FLAG[p.article.fetch_status]));
-      if (safeUrl(p.article.url)) m.appendChild(link(p.article.url, '記事を開く'));
-      r.appendChild(m); a.appendChild(r);
-    }
-    if (p.quoted) {
-      var q = el('div', {'class': 'ref quote'});
-      q.appendChild(el('small', null, '引用元  ' + (p.quoted.author || '') + (p.quoted.handle ? '  @' + p.quoted.handle : '')));
-      q.appendChild(el('span', null, p.quoted.claim || ''));
-      if (safeUrl(p.quoted.url)) { var qm = el('span', {'class': 'r-meta'}); qm.appendChild(link(p.quoted.url, '引用元を開く')); q.appendChild(qm); }
-      a.appendChild(q);
-    }
-    var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
-    var ul = points(p); if (ul) a.appendChild(ul);
-    var kws = keywordsEl(p); if (kws) a.appendChild(kws);
-    var f = el('div', {'class': 'foot'});
-    if (p.importance >= 3) f.appendChild(el('span', {'class': 'must'}, '必読'));
-    f.appendChild(el('span', null, '約' + (p.read_min || 1) + '分'));
-    if (safeUrl(p.url)) f.appendChild(link(p.url, 'Xで開く'));
-    var rb = readButton(p); f.appendChild(rb); a.appendChild(f);
+    var meta = [mustEl(p), el('span', null, '約' + (p.read_min || 1) + '分'), KIND_LABEL[p.kind] ? el('span', null, KIND_LABEL[p.kind]) : null];
+    var rb = readButton(p);
+    var a = makeCard(p, who, meta, function(body){
+      if (p.article) {
+        var r = el('div', {'class': 'ref'});
+        r.appendChild(el('small', null, '記事'));
+        r.appendChild(el('span', {'class': 'r-title'}, p.article.title || p.article.domain || ''));
+        var m = el('span', {'class': 'r-meta'});
+        m.appendChild(el('span', null, p.article.domain || ''));
+        if (FETCH_FLAG[p.article.fetch_status]) m.appendChild(el('span', {'class': 'flag'}, FETCH_FLAG[p.article.fetch_status]));
+        if (safeUrl(p.article.url)) m.appendChild(link(p.article.url, '記事を開く'));
+        r.appendChild(m); body.appendChild(r);
+      }
+      if (p.quoted) {
+        var q = el('div', {'class': 'ref quote'});
+        q.appendChild(el('small', null, '引用元  ' + (p.quoted.author || '') + (p.quoted.handle ? '  @' + p.quoted.handle : '')));
+        q.appendChild(el('span', null, p.quoted.claim || ''));
+        if (safeUrl(p.quoted.url)) { var qm = el('span', {'class': 'r-meta'}); qm.appendChild(link(p.quoted.url, '引用元を開く')); q.appendChild(qm); }
+        body.appendChild(q);
+      }
+      var vz = renderVisual(p.visual); if (vz) { body.appendChild(vz); watch(vz); }
+      var ul = points(p); if (ul) body.appendChild(ul);
+      var kws = keywordsEl(p); if (kws) body.appendChild(kws);
+      var f = el('div', {'class': 'foot'});
+      if (safeUrl(p.url)) f.appendChild(link(p.url, 'Xで開く'));
+      f.appendChild(rb); body.appendChild(f);
+    });
     register(p, a, rb);
     return a;
   }
@@ -1137,25 +1164,24 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       box.appendChild(el('p', {'class': 'none' + (c.status === 'error' ? ' err' : '')}, c.status === 'error' ? '取得失敗' : '更新なし'));
     }
     list.forEach(function(p){
-      var a = el('article', {'class': 'item', 'id': 'item-' + p.id});
       var who = el('p', {'class': 'who'});
-      var dot = el('span', {'class': 'tdot', 'aria-hidden': 'true'}); who.appendChild(dot);
+      who.appendChild(el('span', {'class': 'tdot', 'aria-hidden': 'true'}));
       who.appendChild(el('span', null, p.blog + '・' + (tName[p.theme] || '')));
-      a.appendChild(who);
-      a.appendChild(el('h4', null, p.title));
-      // 本文を取れなかった記事は見出しとリンクだけにする
-      var headOnly = p.fetch_status === 'blocked' || p.fetch_status === 'error';
-      if (headOnly) a.classList.add('head-only');
-      else {
-        var vz = renderVisual(p.visual); if (vz) { a.appendChild(vz); watch(vz); }
-        var ul = points(p); if (ul) a.appendChild(ul);
-        var kws = keywordsEl(p); if (kws) a.appendChild(kws);
-      }
-      var f = el('div', {'class': 'foot'});
-      if (p.importance >= 3 && !headOnly) f.appendChild(el('span', {'class': 'must'}, '必読'));
-      if (p.read_min && !headOnly) f.appendChild(el('span', null, '約' + p.read_min + '分'));
+      var rb = readButton(p), f = el('div', {'class': 'foot'}), a;
       if (safeUrl(p.url)) f.appendChild(link(p.url, '記事を開く'));
-      var rb = readButton(p); f.appendChild(rb); a.appendChild(f);
+      f.appendChild(rb);
+      // 本文を取れなかった記事は見出しとリンクだけにする（開く中身がないので畳まない）
+      if (p.fetch_status === 'blocked' || p.fetch_status === 'error') {
+        a = el('article', {'class': 'item head-only', 'id': 'item-' + p.id});
+        a.appendChild(who); a.appendChild(el('h4', null, p.title)); a.appendChild(f);
+      } else {
+        a = makeCard(p, who, [mustEl(p), p.read_min ? el('span', null, '約' + p.read_min + '分') : null], function(body){
+          var vz = renderVisual(p.visual); if (vz) { body.appendChild(vz); watch(vz); }
+          var ul = points(p); if (ul) body.appendChild(ul);
+          var kws = keywordsEl(p); if (kws) body.appendChild(kws);
+          body.appendChild(f);
+        });
+      }
       register(p, a, rb); box.appendChild(a);
     });
     box._list = list; box._key = 'blog:' + c.company; groups.push(box); blogWrap.appendChild(box);
@@ -1389,6 +1415,11 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       var list = items.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       vm.appendChild(document.createTextNode(list.length + '件（未読 ' + unread + '件）'));
       if (v === 'filter') { var cl = el('button', {'type': 'button', 'class': 'clear'}, '絞り込みを解除'); cl.addEventListener('click', function(){ setView('overview'); }); vm.appendChild(cl); }
+      if (list.some(function(p){ return itemEls[p.id] && itemEls[p.id]._tg; })) {
+        [['すべて開く', true], ['すべて閉じる', false]].forEach(function(o){
+          var fb2 = el('button', {'type': 'button', 'class': 'clear'}, o[0]); fb2.addEventListener('click', function(){ foldAll(o[1]); }); vm.appendChild(fb2);
+        });
+      }
     }
     countNav();
   }
@@ -1399,6 +1430,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     var view = p._src === 'bookmarks' ? 'bm:' + p.theme : p._src === 'blogs' ? 'blog:' + p.company : 'tr:' + p._src;
     if (read[id]) state.unread = false;
     setView(view);
+    if (pe._tg) setOpen(pe, true);
     pe.scrollIntoView({ behavior: 'auto', block: 'center' });
     revealVisible();
     if (!reduced) { pe.classList.remove('flash'); void pe.offsetWidth; pe.classList.add('flash'); }
