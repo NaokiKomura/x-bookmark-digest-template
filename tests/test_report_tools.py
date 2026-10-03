@@ -65,3 +65,28 @@ def test_build_rejects_invalid_data_without_overwriting_output(tmp_path):
     with pytest.raises(SystemExit, match="検証に失敗"):
         rt.cmd_build(src, out)
     assert out.read_text() == "previous report"
+
+
+def test_validate_checks_visual_shapes():
+    data = sample()
+    types = {p["visual"]["type"] for p in data["posts"] if p.get("visual")}
+    assert "matrix" in types  # サンプルに新しい種類の例がある
+    post = data["posts"][0]
+    post["visual"] = {
+        "type": "matrix",
+        "x": {"label": "x"},
+        "y": {"label": "y"},
+        "items": [{"name": "A", "x": 4, "y": 1}],
+    }
+    data["posts"][1]["visual"] = {"type": "flow", "steps": [{"detail": "label がない"}]}
+    data["posts"][3]["visual"] = {"type": "options", "items": [{"name": "A", "value": "多い"}]}
+    data["posts"][5]["visual"] = {
+        "type": "versus",
+        "a": {"label": "A"},
+        "b": {"label": "B"},
+        "criteria": [{"name": "速さ", "better": "c"}],
+    }
+    data["github"][0]["visual"] = {"type": "stat", "value": 3, "compare": {"label": "前回"}}
+    errors = rt.validate_data(data)
+    for word in ("matrix", "flow", "options", "versus", "stat.compare"):
+        assert any(word in e for e in errors), word

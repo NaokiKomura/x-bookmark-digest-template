@@ -17,7 +17,7 @@
 4. テック判定が保留（`jev.tech_label` が `hold`）の項目は、内容を読んでテック系かどうかを決める。テック系でなければ除外リストに移す。`jev.status` が `unavailable` のブックマークと Qiita・Zenn の記事も、同じようにテック判定を自分で行う。
 5. 記事に書かれていることと、引用元の投稿の主張を混ぜずに書き分ける。ブックマークした投稿者の意見や感想は載せない（記事も引用もない投稿だけの項目は、投稿の内容を要点にする）。
 6. 情報源ごとに決めた要約の深さを守る（下の表）。前日にも載っていたランキング項目（`streak_days` が2以上）は、`claude/reports` ブランチの `summaries/<article_key>.json` の要約を再利用する。
-7. 図解の数値は資料に書かれているものだけを使う。なければ数値を使わない種類の図（`flow`、`versus`、`options`、文字の `before_after`）にするか、図を省く。
+7. 図解の数値は資料に書かれているものだけを使う（`options` の `value`、`stat` の `compare` も同じ）。なければ数値を使わない種類の図（`flow`、`versus`、`options`、`matrix`、文字の `before_after`）にするか、図を省く。`matrix` の位置は資料の記述から判断できるときだけ使う。
 8. キーワードは既存レポートの表記に合わせる（手順4で一覧を出して参照する）。
 9. `template/report.html` の `report-data` ブロックだけを書き換え、ほかの部分は変更しない（`report_tools.py build` を使えばそうなる）。
 10. 書き換えたHTMLは `report_tools.py validate` が `OK` を返すまで直してから出力する。
@@ -121,11 +121,12 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 
 | 種類 | 使う場面 | データ |
 | --- | --- | --- |
-| before_after | 変化を伝える | `before` と `after`（それぞれ `label` と、数値があれば `value`、なければ `text`）。数値なら `unit`。任意で `label` |
-| flow | 手順や因果を伝える | `steps`（3〜5個） |
-| versus | AとBの優劣を伝える | `a`、`b`（それぞれ `label` と任意の `note`）、`winner`（`"a"`/`"b"`）、任意で `caption` |
-| options | 並列の案や条件を並べる | `items`（2〜4個、それぞれ `name` と任意の `note`） |
-| stat | 1つの数字が要点になる | `value`、`unit`、`label` |
+| before_after | 変化を伝える | `before` と `after`（それぞれ `label` と、数値があれば `value`、なければ `text`）。数値なら `unit`。任意で `label`。数値なら画面で前後を切り替えられる |
+| flow | 手順や因果を伝える | `steps`（3〜5個）。各手順は文字列か `{"label", "detail"}`。`detail` は手順を押したときに出る1文の説明で、できるだけ付ける |
+| versus | AとBの優劣を伝える | `a`、`b`（それぞれ `label` と任意の `note`）、`winner`（`"a"`/`"b"`）、任意で `caption`。比べる観点が2つ以上あれば `criteria`（`{"name", "a", "b", "better": "a"/"b"}` の配列。`a`・`b` は各側の短い説明）を付ける。観点ごとの比較表になる |
+| options | 並列の案や条件を並べる | `items`（2〜4個、それぞれ `name` と任意の `note`）。資料に全案の数値があれば各案に `value`、図に `unit` を付ける。並べ替えできる横棒グラフになる |
+| stat | 1つの数字が要点になる | `value`、`unit`、`label`。資料に比べる数字があれば `compare`（`{"value", "label"}`）。`unit` が `%` なら円グラフになる |
+| matrix | 2つの軸で項目の位置づけを示す | `x`・`y`（それぞれ `{"label", "low", "high"}`）、`items`（2〜6個、それぞれ `name`、`x`・`y` は 1〜3 の相対位置、任意の `note`）。位置は資料の記述から判断した相対的なもので、画面に数値は出ない |
 
 ### 6. 組み立てて検証する
 

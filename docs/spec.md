@@ -400,11 +400,14 @@ Qiita、Zenn、DevelopersIOの1件は `kind: "article"` で、`likes`（いい�
 
 | 種類 | 使う場面 | データ |
 | --- | --- | --- |
-| before\_after | 変化を伝える | `before` と `after`。数値があれば `value` と `unit`、なければ `text` |
-| flow | 手順や因果を伝える | `steps`（3〜5個） |
-| versus | AとBの優劣を伝える | `a`、`b`、`winner`、任意で `caption` |
-| options | 並列の案や条件を並べる | `items`（2〜4個） |
-| stat | 1つの数字が要点になる | `value`、`unit`、`label` |
+| before\_after | 変化を伝える | `before` と `after`。数値があれば `value` と `unit`、なければ `text`。数値なら前後を切り替えて数字が動く |
+| flow | 手順や因果を伝える | `steps`（3〜5個。文字列か `{label, detail}`）。手順を押すと説明が出て、再生ボタンで順に進む |
+| versus | AとBの優劣を伝える | `a`、`b`、`winner`、任意で `caption`、`criteria`（観点ごとの `a`・`b`・`better`）。観点があれば比較表と、有利な観点の数を示すバーを出し、有利な側で絞り込める |
+| options | 並列の案や条件を並べる | `items`（2〜4個）。全案に `value` があれば並べ替えできる横棒グラフ、押すと注記が出る |
+| stat | 1つの数字が要点になる | `value`、`unit`、`label`、任意で `compare`。`%` なら円グラフ、`compare` があれば比較の棒と倍率 |
+| matrix | 2つの軸で位置づけを示す | `x`・`y`（軸の名前と両端の言葉）、`items`（`x`・`y` は1〜3の相対位置）。点を押すと説明が出る |
+
+図解はキーボードでも操作でき、動きを減らす設定ではアニメーションしない。外部のライブラリは使わない（SVGとDOMで描く）。
 
 図にすると分かりにくくなる投稿は `visual` を省略する。
 

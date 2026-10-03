@@ -22,13 +22,18 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "template" / "report.html"
 BLOCK = re.compile(r'(<script type="application/json" id="report-data">)(.*?)(</script>)', re.S)
-VISUAL_TYPES = {"before_after", "flow", "versus", "options", "stat"}
+VISUAL_TYPES = {"before_after", "flow", "versus", "options", "stat", "matrix"}
+MATRIX_LEVELS = (1, 2, 3)
 POST_KINDS = {"post", "quote", "article", "quote_article"}
 FETCH_STATUSES = {"ok", "partial", "blocked", "error"}
 SOURCE_STATES = {"ok", "none", "error"}
 EXCLUDED_SOURCES = {"bookmarks", "qiita", "zenn"}
 SOURCE_NAMES = {"bookmarks", "blogs", "github", "qiita", "zenn", "devio"}
 MAX_READ_MIN = 15
+
+
+def is_number(x: Any) -> bool:
+    return isinstance(x, int | float) and not isinstance(x, bool)
 
 
 def load_topics() -> list[dict[str, str]]:
@@ -193,6 +198,69 @@ def validate_data(data: Any) -> list[str]:
 
     ids: set[str] = set()
 
+    def check_visual(where: str, v: Any) -> None:
+        if not isinstance(v, dict) or v.get("type") not in VISUAL_TYPES:
+            need(False, f"{where}: visual.type が不明")
+            return
+        kind = v["type"]
+        if kind == "flow":
+            steps = v.get("steps")
+            need(
+                isinstance(steps, list)
+                and bool(steps)
+                and all(
+                    isinstance(s, str) or (isinstance(s, dict) and isinstance(s.get("label"), str))
+                    for s in steps
+                ),
+                f"{where}: flow.steps は文字列か {{label, detail?}} の配列",
+            )
+        elif kind == "options":
+            items = v.get("items")
+            need(
+                isinstance(items, list)
+                and all(isinstance(i, dict) and i.get("name") for i in items),
+                f"{where}: options.items に name がない",
+            )
+            for i in items if isinstance(items, list) else []:
+                if isinstance(i, dict) and "value" in i:
+                    need(is_number(i["value"]), f"{where}: options.items.value が数値でない")
+        elif kind == "versus":
+            for c in v.get("criteria") or []:
+                need(
+                    isinstance(c, dict)
+                    and bool(c.get("name"))
+                    and c.get("better") in (None, "a", "b"),
+                    f"{where}: versus.criteria は name と better（a/b）",
+                )
+        elif kind == "stat":
+            need(is_number(v.get("value")), f"{where}: stat.value が数値でない")
+            if v.get("compare") is not None:
+                cmp = v["compare"]
+                need(
+                    isinstance(cmp, dict)
+                    and is_number(cmp.get("value"))
+                    and bool(cmp.get("label")),
+                    f"{where}: stat.compare は value と label",
+                )
+        elif kind == "matrix":
+            items = v.get("items")
+            need(
+                isinstance(v.get("x"), dict) and isinstance(v.get("y"), dict),
+                f"{where}: matrix に x と y の軸がない",
+            )
+            need(
+                isinstance(items, list)
+                and 1 <= len(items) <= 8
+                and all(
+                    isinstance(i, dict)
+                    and i.get("name")
+                    and i.get("x") in MATRIX_LEVELS
+                    and i.get("y") in MATRIX_LEVELS
+                    for i in items
+                ),
+                f"{where}: matrix.items は1〜8個で、x と y は 1〜3",
+            )
+
     def check_item(section: str, item: dict[str, Any]) -> None:
         iid = str(item.get("id", ""))
         need(bool(iid), f"{section}: id がない")
@@ -212,7 +280,7 @@ def validate_data(data: Any) -> list[str]:
             f"{section} {iid}: url が https でない",
         )
         if "visual" in item and item["visual"] is not None:
-            need(item["visual"].get("type") in VISUAL_TYPES, f"{section} {iid}: visual.type が不明")
+            check_visual(f"{section} {iid}", item["visual"])
         for k in ("keywords", "points"):
             if k in item:
                 need(isinstance(item[k], list), f"{section} {iid}: {k} が配列でない")
