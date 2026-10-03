@@ -35,11 +35,13 @@ def test_validate_catches_bad_items():
     data["posts"][1]["url"] = "javascript:alert(1)"
     data["picks"].append("nope")
     del data["blogs"][0]["fetch_status"]
+    data["posts"][2]["read_min"] = 54
     errors = rt.validate_data(data)
     assert any("theme" in e for e in errors)
     assert any("https" in e for e in errors)
     assert any("nope" in e for e in errors)
     assert any("fetch_status" in e for e in errors)
+    assert any("read_min" in e for e in errors)
 
 
 def test_trend_counts_missing_days_as_zero(monkeypatch, tmp_path):

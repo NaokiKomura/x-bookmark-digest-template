@@ -51,7 +51,7 @@
 | キー | 内容 |
 | --- | --- |
 | `fetch_status` | `ok`（500文字以上）、`partial`（500文字未満。有料記事など）、`blocked`（robots.txt で禁止）、`error`（取得エラー） |
-| `chars` | 抽出した本文の元の文字数。読了目安（500文字 = 1分）に使う |
+| `chars` | 抽出した本文の元の文字数。読了目安（500文字 = 1分、1件15分まで）に使う |
 | `text` | 本文。最大 20,000 文字 |
 | `title`、`site_name`、`published` | trafilatura が取り出したもの。README は `title` がリポジトリ名、`site_name` が GitHub |
 

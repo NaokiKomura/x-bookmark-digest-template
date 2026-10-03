@@ -84,7 +84,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | picks | 「まず読む3件」の項目ID。全情報源から、重要度とほかの項目とのつながりで選ぶ |
 | trend | `python3 scripts/report_tools.py trend "$DAY"` の出力をそのまま使う |
 | posts | ブックマークの要約（下の表） |
-| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（ok 以外なら画面に印が出る） |
+| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（ok 以外なら画面に印が出る）。`read_min` は記事の `chars`（取れなければ `summary` の文字数）÷ 500 を切り上げ、最低1・最大15 |
 | blog_companies | 企業ごとの状況。`{"company", "label", "status": "ok"/"none"/"error", "count"}`。`blog_status` を企業単位にまとめる（どれか1つでも新着があれば ok、全ブログが error なら error、それ以外は none） |
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
@@ -103,7 +103,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | points | 補足の要点1〜3個 |
 | keywords | 2〜3個 |
 | importance | 1〜3。3は「必読」 |
-| read_min | 記事がある場合は記事の `chars` ÷ 500 を切り上げ（最低1）。ない場合は投稿と引用元の文字数 ÷ 500 を切り上げ（最低1） |
+| read_min | 記事がある場合は記事の `chars` ÷ 500 を切り上げ。ない場合は投稿と引用元の文字数 ÷ 500 を切り上げ。どちらも最低1、最大15（長い README や記事で合計が膨らまないようにする） |
 | kind | `quoted` も `links` もなければ `post`、`quoted` だけなら `quote`、`links` だけなら `article`、両方なら `quote_article` |
 | article | 記事があるとき。`{"title", "domain", "url", "fetch_status"}`。リンクが複数あるときは主な1本 |
 | quoted | 引用のとき。`{"author", "handle", "url", "claim"}`（claim は引用元の主張の1文要約） |

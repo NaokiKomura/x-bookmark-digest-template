@@ -28,6 +28,7 @@ FETCH_STATUSES = {"ok", "partial", "blocked", "error"}
 SOURCE_STATES = {"ok", "none", "error"}
 EXCLUDED_SOURCES = {"bookmarks", "qiita", "zenn"}
 SOURCE_NAMES = {"bookmarks", "blogs", "github", "qiita", "zenn", "devio"}
+MAX_READ_MIN = 15
 
 
 def load_topics() -> list[dict[str, str]]:
@@ -222,7 +223,6 @@ def validate_data(data: Any) -> list[str]:
         need(1 <= len(p.get("points", [])) <= 3, f"posts {p.get('id')}: points は1〜3個")
         need(2 <= len(p.get("keywords", [])) <= 3, f"posts {p.get('id')}: keywords は2〜3個")
         need(p.get("importance") in (1, 2, 3), f"posts {p.get('id')}: importance は1〜3")
-        need(isinstance(p.get("read_min"), int | float), f"posts {p.get('id')}: read_min がない")
         if p.get("kind") in ("article", "quote_article"):
             art = p.get("article") or {}
             need(
@@ -238,6 +238,13 @@ def validate_data(data: Any) -> list[str]:
     for section in ("github", "articles", "blogs"):
         for item in data[section]:
             check_item(section, item)
+    for section in ("posts", "blogs"):
+        for item in data[section]:
+            rm = item.get("read_min")
+            need(
+                isinstance(rm, int | float) and 1 <= rm <= MAX_READ_MIN,
+                f"{section} {item.get('id')}: read_min は1〜{MAX_READ_MIN}",
+            )
     for b in data["blogs"]:
         need(
             b.get("fetch_status") in FETCH_STATUSES,
