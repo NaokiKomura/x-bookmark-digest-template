@@ -27,6 +27,11 @@ main{max-width:760px;margin:0 auto;padding:28px 20px 56px;min-width:0}
 .sidebar-top{display:flex;align-items:center;justify-content:space-between;padding:0 8px 10px}
 .sidebar-title{font-size:14px;font-weight:700}
 .sidebar-close{display:none;font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--ink2);cursor:pointer;padding:4px 8px}
+.search{padding:0 4px 8px}
+.search input{font:inherit;font-size:14px;width:100%;box-sizing:border-box;padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.search input:focus{outline:2px solid var(--focus);outline-offset:0;border-color:transparent}
+.search-n{font-size:12px;color:var(--ink3);margin:4px 2px 0}
+.search-n:empty{display:none}
 .nav{list-style:none;margin:0;padding:0;flex:1}
 .nav li{margin:0}
 .nav .grp{margin-top:12px}
@@ -318,6 +323,10 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       <span class="sidebar-title">ブックマーク日報</span>
       <button class="sidebar-close" id="side-close" type="button" aria-label="カテゴリを閉じる">×</button>
     </div>
+    <div class="search" role="search">
+      <input type="search" id="q" placeholder="キーワードで検索" aria-label="キーワードで検索" autocomplete="off">
+      <p class="search-n" id="q-n" aria-live="polite"></p>
+    </div>
     <ul class="nav" id="nav"></ul>
     <div class="sidebar-foot">
       <button class="chip src" id="unread" type="button" aria-pressed="false">未読だけ表示</button>
@@ -591,7 +600,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
   // ---------- 絞り込みの状態 ----------
   // view: overview（概要）/ bm・bm:<トピック> / blog・blog:<企業> / tr・tr:<情報源> / filter（マップから絞り込み）
-  var state = { view: 'overview', theme: null, keyword: null, unread: false };
+  var state = { view: 'overview', theme: null, keyword: null, query: '', unread: false };
 
   var kwItems = {};
   items.forEach(function(p){ (p.keywords || []).forEach(function(k){ (kwItems[k] = kwItems[k] || []).push(p); }); });
@@ -1228,6 +1237,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var TREND_SRC = ['github', 'qiita', 'zenn', 'devio'];
   function inView(p, view){
     var i = view.indexOf(':'), kind = i < 0 ? view : view.slice(0, i), key = i < 0 ? '' : view.slice(i + 1);
+    if (kind === 'search') return matchesQuery(p);
     if (kind === 'filter') return (!state.theme || p.theme === state.theme) && (!state.keyword || (p.keywords || []).indexOf(state.keyword) >= 0);
     if (kind === 'bm') return p._src === 'bookmarks' && (!key || p.theme === key);
     if (kind === 'blog') return p._src === 'blogs' && (!key || p.company === key);
@@ -1269,6 +1279,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   }
   function setView(view, theme, keyword){
     state.view = view; state.theme = theme || null; state.keyword = keyword || null;
+    if (view !== 'search' && state.query) { state.query = ''; qInput.value = ''; qCount.textContent = ''; }
     apply();
     window.scrollTo(0, 0);
     revealVisible();
@@ -1283,6 +1294,27 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       });
     });
   }
+
+  // ---------- キーワード検索 ----------
+  // 見出し・要点・キーワード・概要・投稿者・記事名・引用元を対象に、空白で区切ったすべての語を含む項目を出す
+  var qInput = document.getElementById('q'), qCount = document.getElementById('q-n'), qTimer;
+  items.forEach(function(p){
+    p._text = [p.title, p.summary, p.author, p.handle, p.company_label, p.blog, SRC[p._src], tName[p.theme],
+      (p.points || []).join(' '), (p.keywords || []).join(' '), p.article && p.article.title, p.quoted && p.quoted.claim]
+      .filter(Boolean).join(' ').toLowerCase();
+  });
+  function terms(){ return state.query.toLowerCase().split(/\s+/).filter(Boolean); }
+  function matchesQuery(p){ return terms().every(function(t){ return p._text.indexOf(t) >= 0; }); }
+  function runSearch(){
+    state.query = qInput.value.trim();
+    if (state.query) { setView('search'); qCount.textContent = items.filter(matchesQuery).length + '件見つかりました'; }
+    else { qCount.textContent = ''; if (state.view === 'search') setView('overview'); }
+  }
+  qInput.addEventListener('input', function(){ clearTimeout(qTimer); qTimer = setTimeout(runSearch, 150); });
+  qInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { clearTimeout(qTimer); runSearch(); closeSide(); }
+    if (e.key === 'Escape' && qInput.value) { e.stopPropagation(); qInput.value = ''; runSearch(); }
+  });
 
   // ---------- 表示の反映 ----------
   function apply(){
@@ -1313,7 +1345,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       var sec = document.getElementById(s[0]);
       sec.hidden = !(groups.some(function(g){ return !g.hidden && sec.contains(g); }) || v === s[1]);
       // 1つのカテゴリだけを見ているときは、上の見出しで足りるので区切りの見出しを隠す
-      sec.classList.toggle('solo', v !== 'filter');
+      sec.classList.toggle('solo', v !== 'filter' && v !== 'search');
     });
     document.getElementById('ov').hidden = !ov;
     [['sum-blogs', 'blogs', 'blog'], ['sum-trends', 'trends', 'tr']].forEach(function(x){
@@ -1325,11 +1357,11 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
 
     var head = document.getElementById('view-head');
     head.hidden = ov;
-    var title = v === 'filter' ? (state.keyword ? 'キーワード「' + state.keyword + '」' : (tName[state.theme] || '')) : (VIEW_LABEL[v] || '');
+    var title = v === 'search' ? '「' + state.query + '」の検索結果' : v === 'filter' ? (state.keyword ? 'キーワード「' + state.keyword + '」' : (tName[state.theme] || '')) : (VIEW_LABEL[v] || '');
     document.getElementById('view-title').textContent = title;
     document.getElementById('topbar-title').textContent = ov ? '概要' : title;
     var crumb = document.getElementById('crumb'); crumb.textContent = '';
-    var par = VIEW_PARENT[v] || (v === 'filter' ? 'overview' : null);
+    var par = VIEW_PARENT[v] || (v === 'filter' || v === 'search' ? 'overview' : null);
     if (par) {
       var cb = el('button', {'type': 'button'}, VIEW_LABEL[par]); cb.addEventListener('click', function(){ setView(par); });
       crumb.appendChild(cb);
@@ -1338,7 +1370,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     if (!ov) {
       var list = items.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       vm.appendChild(document.createTextNode(list.length + '件（未読 ' + unread + '件）'));
-      if (v === 'filter') { var cl = el('button', {'type': 'button', 'class': 'clear'}, '絞り込みを解除'); cl.addEventListener('click', function(){ setView('overview'); }); vm.appendChild(cl); }
+      if (v === 'filter' || v === 'search') { var cl = el('button', {'type': 'button', 'class': 'clear'}, v === 'search' ? '検索をやめる' : '絞り込みを解除'); cl.addEventListener('click', function(){ setView('overview'); }); vm.appendChild(cl); }
       if (list.some(function(p){ return itemEls[p.id] && itemEls[p.id]._tg; })) {
         [['すべて開く', true], ['すべて閉じる', false]].forEach(function(o){
           var fb2 = el('button', {'type': 'button', 'class': 'clear'}, o[0]); fb2.addEventListener('click', function(){ foldAll(o[1]); }); vm.appendChild(fb2);
