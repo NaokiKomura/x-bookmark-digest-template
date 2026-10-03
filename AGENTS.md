@@ -9,7 +9,7 @@ Jev（TypeSafe AI）で振り分け、Claude または Codex が要約する個�
 Claude は claude.ai のアーティファクト、Codex は Cloud タスクの結果チャットに届ける。
 
 ```text
-GitHub Actions 6:00 JST（取得層: scripts/*.py）            Claude ルーチン 7:00 JST（要約層: ROUTINE.md）
+GitHub Actions 5:00 JST（取得層: scripts/*.py）            Claude ルーチン 7:00 JST（要約層: ROUTINE.md）
  fetch_bookmarks → fetch_sources → fetch_articles → classify_jev ─→ data/ を main にコミット ─→ report_tools.py で
                                                                                                template/report.html に差し込み → アーティファクト
 ```
@@ -35,7 +35,7 @@ Codex は `config/report.json` の `artifact_url` を使わない。
 | --- | --- | --- |
 | 集めるトレンド | 複数選択 | `configure_sources --list` の `trends` グループ |
 | 集める公式テックブログ | 複数選択 | 同じく `blogs` グループ（企業単位） |
-| 取得ワークフロー（GitHub Actions、毎朝6:00） | 1つ選ぶ | 有効にして今すぐ1回試す／有効にするだけ（翌朝6:00から）／あとで自分で設定する |
+| 取得ワークフロー（GitHub Actions、毎朝5:00） | 1つ選ぶ | 有効にして今すぐ1回試す／有効にするだけ（翌朝5:00から）／あとで自分で設定する |
 | 要約のルーチン（Claude、毎朝7:00） | 1つ選ぶ | 今作る（毎日7:00）／あとで自分で作る（「その他」で時刻を指定できる） |
 
 Claude Code では AskUserQuestion の1回の呼び出しにこの4問を入れる（情報源の2問は `multiSelect: true`。1問4択まで。
@@ -65,7 +65,7 @@ Codex で作業する場合、要約の実行先は Codex Cloud として [CODEX
 以下の Claude 用設定でルーチンを作らない。Cloud の定期起動を設定できない場合は、その未設定項目を報告する。
 
 - Claude Code では schedule スキル（`/schedule`）でルーチンを作る。設定は README のセットアップ手順5の表のとおり（毎日7:00、モデル Sonnet、コネクタなし、プロンプトは表の文面）。
-  利用者が時刻を指定したらその時刻にする。取得ワークフローは6:00に始まり数分かかる（遅れることもある）ので、6:30より前を指定されたら、その旨を伝えて確かめる。
+  利用者が時刻を指定したらその時刻にする。取得ワークフローは5:00に始まり数分かかる（遅れることもある）ので、5:30より前を指定されたら、その旨を伝えて確かめる。
 - ルーチンを作れないエージェントでは作らず、README の手順5を示して、claude.ai/code/routines で作ってもらう。
 - 作ったら「今すぐ実行」で1回試すかを尋ねる。
 

@@ -5,7 +5,7 @@
 
 | 層 | どこで動くか | すること |
 | --- | --- | --- |
-| 取得層 | GitHub Actions（`fetch.yml`、毎日 6:00 JST） | トークン更新、ブックマーク・情報源・本文の取得、Jev での判定、main へのコミット |
+| 取得層 | GitHub Actions（`fetch.yml`、毎日 5:00 JST） | トークン更新、ブックマーク・情報源・本文の取得、Jev での判定、main へのコミット |
 | 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | main のデータを読み、report-data と要約キャッシュを生成 |
 | 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | 検証して実行者ごとの履歴を保存。Claude は固定アーティファクトも更新 |
 | 表示層 | Claude のアーティファクト、または Codex の結果チャット・受け渡した HTML | `template/report.html` に report-data を差し込んだもの |
