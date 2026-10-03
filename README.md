@@ -1,14 +1,14 @@
 # x-bookmark-digest
 
 毎朝、Xのブックマークと、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）、主要4社の公式テックブログの更新を集め、
-図解つきの要約レポートとして claude.ai のアーティファクトに届ける個人用システムのテンプレート。仕様は [docs/spec.md](docs/spec.md)。
+図解つきの要約レポートとして、Claude なら claude.ai のアーティファクト、Codex なら Codex Cloud の結果チャットに届ける個人用システムのテンプレート。仕様は [docs/spec.md](docs/spec.md)。
 
 | 層 | どこで動くか | すること |
 | --- | --- | --- |
 | 取得層 | GitHub Actions（`fetch.yml`、毎日 6:00 JST） | トークン更新、ブックマーク・情報源・本文の取得、Jev での判定、main へのコミット |
-| 要約層 | Claude Code のルーチン（毎日 7:00 JST、Sonnet） | main のデータを読み、report-data と要約キャッシュを生成 |
-| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | 検証してアーティファクトを更新、`claude/reports` に履歴を保存 |
-| 表示層 | claude.ai のアーティファクト | `template/report.html` に report-data を差し込んだもの |
+| 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | main のデータを読み、report-data と要約キャッシュを生成 |
+| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | 検証して実行者ごとの履歴を保存。Claude は固定アーティファクトも更新 |
+| 表示層 | Claude のアーティファクト、または Codex の結果チャット・受け渡した HTML | `template/report.html` に report-data を差し込んだもの |
 
 X API と TypeSafe AI の認証情報は GitHub Secrets にだけ置き、ルーチンには渡さない。Claude は API キーを使わず、サブスクの利用枠で動く。
 
@@ -18,7 +18,7 @@ X API と TypeSafe AI の認証情報は GitHub Secrets にだけ置き、ルー
 | --- | --- |
 | X API | 開発者アプリ（OAuth 2.0、Type of App は Web App など Confidential client）。コールバック URL に `http://127.0.0.1:8765/callback` を登録する。ブックマーク API は従量課金の対象 |
 | TypeSafe AI | API キー（判定モデル Jev。入力100万トークンあたり約0.042ドル） |
-| Claude | Pro 以上のプラン（Claude Code のルーチンを使う） |
+| 要約担当 | Claude Code のルーチンを使えるプラン、または Codex Cloud を利用できるアカウントと公開済み環境 |
 | GitHub | プライベートリポジトリ1つ |
 | 手元 | [uv](https://docs.astral.sh/uv/) と [gh](https://cli.github.com/)（初回の認証に使う） |
 
@@ -34,7 +34,9 @@ cd x-bookmark-digest
 git push origin "$(git commit-tree "$(git hash-object -t tree /dev/null)" -m 'init reports')":refs/heads/claude/reports
 ```
 
-最後の行は、要約の履歴を置く空の `claude/reports` ブランチを作る。
+最後の行は、Claude の要約履歴を置く空の `claude/reports` ブランチを作る。
+Codex で運用する場合は、最後の行の保存先を `refs/heads/codex/reports` にする。
+両方を使う場合は、それぞれの履歴ブランチを作る。既存のブランチにはこの初期化を行わない。
 
 ### 1.5. 集める情報源を選ぶ
 
@@ -94,6 +96,9 @@ gh variable list -R $REPO   # 自分のリポジトリに DIGEST_ENABLED が入�
 
 ### 5. ルーチンを作る
 
+Codex Cloud で動かす場合は [CODEX.md](CODEX.md) の環境準備とプロンプトを使う。
+届け先は実行したタスクの結果チャット、履歴は `codex/reports`。以下は Claude 用の設定である。
+
 claude.ai/code/routines で次のように作り、「今すぐ実行」で1回試す。
 
 | 設定 | 値 |
@@ -138,12 +143,15 @@ scripts/lib/        共通部品（パスと JSON、URL、HTTP、ページの読
 config/             手で編集する設定（トピック、情報源、Jev の問い、アーティファクトの URL）
 state/, data/       ワークフローが毎日書く
 template/           レポートのテンプレート（サンプルデータ入り）
-ROUTINE.md          要約生成の手順書（プロンプト本体）
+ROUTINE.md          実行者の振り分けと共通の要約手順
+CODEX.md            Codex Cloud の準備と結果チャットへの受け渡し
 PUBLISH.md          別環境での検証・公開の手順書
 docs/               設計（architecture）、データの形（data）、命名規則（conventions）、変更の手順（recipes）、元の仕様書（spec）
 ```
 
-`claude/reports` ブランチに `reports/YYYY-MM-DD.html` と `summaries/<article_key>.json` が溜まる。
+公開担当が Claude は `claude/reports`、Codex は `codex/reports` に
+`reports/YYYY-MM-DD.html` と `summaries/<article_key>.json` を保存する。
+Cloud の作業領域や結果チャットへのファイル受け渡しだけでは、翌日の要約キャッシュは保存されない。
 
 ## 開発
 
@@ -172,6 +180,9 @@ make preview   # サンプルデータ入りのレポートをブラウザで開
 | GitHub Actions | 取得ワークフローは実測1〜1.6分/回（ブックマーク3件で66秒、30件と本文約120件で98秒）。ジョブごとに分単位で切り上げて数えるので2分/日 ≒ 60分/月。CI は約20秒/回で1分/push。合わせて月100〜200分程度で、プライベートリポジトリの無料枠（Free プランで2,000分/月、Pro は3,000分/月）の1割未満。超えると Linux $0.006/分 | $0 |
 | GitHub のストレージ | 記事本文が約1MB/日（実測: 64件で約1MB）増える。1年で約0.35GB（git の圧縮前） | $0（リポジトリの推奨上限 数GB の範囲） |
 
+Codex を要約担当にする場合、取得層の外部API呼び出し回数は同じ。
+要約の利用枠・料金は Codex 側の契約と実行方法に従うため、下の合計に Codex の料金は含めない。
+
 合計は **月 約$1〜$8**（ほぼ X API の展開データが課金されるかどうかで決まる）と Claude のサブスク料金。
 GitHub は無料枠に収まる想定で、追加の費用はかからない（Actions は月100〜200分程度で、Free プランの無料枠2,000分/月の1割未満。ほかに Actions を使うワークフローがない前提。使用量は GitHub の Settings → Billing で確かめられる）。
 X API の初回の支払い登録で $20 分のクレジットが付く。実際の金額は、運用開始から数日後に X の Developer Console の利用状況で確かめる。
@@ -181,6 +192,9 @@ X API の初回の支払い登録で $20 分のクレジットが付く。実際
 接続先制限・総時間制限による追加のAPI呼び出しや再試行はない。要約と公開の分離は手動公開を前提とし、追加のモデル呼び出しは行わない。
 
 ## 1日あたりの外部への呼び出し
+
+Codex Cloud に要約担当を替えても、下表の取得層の呼び出し回数は変わらない。
+結果チャットへの受け渡しのために外部記事を取り直すことはない。
 
 | 相手 | 回数の目安 |
 | --- | --- |

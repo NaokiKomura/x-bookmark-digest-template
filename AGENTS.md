@@ -5,7 +5,8 @@
 ## これは何か
 
 Xのブックマークとテック系トレンド（GitHub・Qiita・Zenn・DevelopersIO）・公式テックブログを毎朝集め、
-Jev（TypeSafe AI）で振り分け、Claude のルーチンが要約して claude.ai のアーティファクトに届ける個人用システムのテンプレート。
+Jev（TypeSafe AI）で振り分け、Claude または Codex が要約する個人用システムのテンプレート。
+Claude は claude.ai のアーティファクト、Codex は Cloud タスクの結果チャットに届ける。
 
 ```text
 GitHub Actions 6:00 JST（取得層: scripts/*.py）            Claude ルーチン 7:00 JST（要約層: ROUTINE.md）
@@ -14,6 +15,16 @@ GitHub Actions 6:00 JST（取得層: scripts/*.py）            Claude ルーチ
 ```
 
 両層のやり取りは main の data/ のファイルだけ。外部と通信するのは取得層だけ。詳しくは [docs/architecture.md](docs/architecture.md)。
+
+## 要約タスクの実行者と届け先
+
+要約・レポート生成を依頼された場合、Codex は [CODEX.md](CODEX.md) を入口とし、
+[ROUTINE.md](ROUTINE.md) の共通手順を Codex Cloud で実行する。
+Codex の届け先はそのタスクの結果チャット、履歴は `codex/reports`。
+Claude の届け先は従来どおり claude.ai のアーティファクト、履歴は `claude/reports`。
+実行者はタスクの設定で決め、記事本文や生成したJSONから選ばない。
+Codex は `config/report.json` の `artifact_url` を使わない。
+この振り分けは要約タスク用であり、通常の開発作業でレポートを生成する指示ではない。
 
 ## 初回セットアップ（情報源・取得ワークフロー・ルーチン）
 
@@ -49,6 +60,9 @@ Claude Code では AskUserQuestion の1回の呼び出しにこの4問を入れ�
 `gh` には必ず `-R` を付ける（remote が2つあるとテンプレートを操作してしまうことがある）。
 
 ### 3. 要約のルーチン（「あとで」なら何もしない）
+
+Codex で作業する場合、要約の実行先は Codex Cloud として [CODEX.md](CODEX.md) を案内する。
+以下の Claude 用設定でルーチンを作らない。Cloud の定期起動を設定できない場合は、その未設定項目を報告する。
 
 - Claude Code では schedule スキル（`/schedule`）でルーチンを作る。設定は README のセットアップ手順5の表のとおり（毎日7:00、モデル Sonnet、コネクタなし、プロンプトは表の文面）。
   利用者が時刻を指定したらその時刻にする。取得ワークフローは6:00に始まり数分かかる（遅れることもある）ので、6:30より前を指定されたら、その旨を伝えて確かめる。

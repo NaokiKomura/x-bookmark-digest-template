@@ -6,7 +6,7 @@ Oct 3, 2026 · @古村直輝
 
 ## 概要
 
-毎朝、Xのブックマークに加えて、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）と主要4社の公式テックブログの更新を自動で集め、図解つきの要約レポートとしてclaude.aiのアーティファクトに届ける。テック系かどうかの判定とトピックの分類はTypeSafe AIの判定モデルJevで行い、要約だけをClaudeに任せる。
+毎朝、Xのブックマークに加えて、その日のテック系トレンド（GitHub、Qiita、Zenn、DevelopersIO）と主要4社の公式テックブログの更新を自動で集め、図解つきの要約レポートとして、Claudeならclaude.aiのアーティファクト、CodexならCodex Cloudの結果チャットに届ける。テック系かどうかの判定とトピックの分類はTypeSafe AIの判定モデルJevで行い、要約だけをClaudeまたはCodexに任せる。
 
 前提条件は次のとおり。
 
@@ -14,7 +14,7 @@ Oct 3, 2026 · @古村直輝
 | --- | --- |
 | X API | 登録済みの開発者アプリ。OAuth 2.0（PKCE）のユーザーコンテキストで利用する |
 | TypeSafe AI | 発行済みのAPIキー。判定モデルJevでテック判定とトピック分類を行う |
-| Claude | Proプラン。Claude Codeのルーチン（クラウド版スケジュールタスク）で要約する |
+| 要約担当 | Claude Codeのルーチンを使えるプラン、またはCodex Cloudを利用できるアカウントと公開済み環境 |
 | GitHub | プライベートリポジトリ1つ。GitHub Actionsで取得と判定を動かす |
 | 情報源 | Xのブックマーク、GitHubトレンド、Qiita・Zenn・DevelopersIOのランキング、Anthropic・OpenAI・Google・AWSの公式テックブログ |
 | 実行時刻 | 取得と判定 6:00、要約 7:00（日本時間） |
@@ -24,7 +24,7 @@ ClaudeはAPIキーを使わず、サブスクの利用枠内で動かす。X API
 
 ## システム構成
 
-取得層（GitHub）が外部との通信と秘密情報をすべて引き受け、要約層（Claude）はリポジトリのファイルを読んでレポートを書くだけにする。両者のやり取りはリポジトリ上のファイルに限る。
+取得層（GitHub）が外部との通信と秘密情報をすべて引き受け、要約層（ClaudeまたはCodex）はリポジトリのファイルを読んでレポートを書くだけにする。両者のやり取りはリポジトリ上のファイルに限る。
 
 ```mermaid
 flowchart LR
@@ -34,15 +34,16 @@ flowchart LR
     F --> J[Jev で判定]
   end
   J -->|data/ を main にコミット| R
-  subgraph 要約層["要約層（Claude ルーチン 7:00）"]
+  subgraph 要約層["要約層（Claude または Codex Cloud、7:00 を想定）"]
     R[main のデータを読む] --> S[要約・report-data 作成]
   end
   S -->|report-data| P[別環境で検証・公開]
-  P -->|公開し直す| A[アーティファクト]
-  P -->|履歴| B[claude/reports ブランチ]
+  P -->|公開し直す| A[Claude のアーティファクト]
+  P -->|履歴| B[実行者ごとの履歴ブランチ]
+  S -->|Codex の結果| C[タスクの結果チャット]
 ```
 
-X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ルーチンはmainのデータを読んでJSONを生成する。別環境の公開担当が検証・組み立てを行い、アーティファクトとclaude/reportsブランチへ保存する。
+X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ルーチンはmainのデータを読んでJSONを生成する。別環境の公開担当が検証・組み立てを行い、Claudeは固定アーティファクトとclaude/reports、Codexはcodex/reportsへ保存する。Codexの閲覧用レポートは生成タスクの結果チャットへ渡す。
 
 ## 処理フローとデータの遷移
 
@@ -55,7 +56,12 @@ X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。ル
 5. **Jevで判定**：ブックマークとQiita・Zennの記事はテック系かどうかを判定し、非テックを除外する。残ったすべての項目をトピックに分類する（詳細は「Jevによる判定」）。
 6. **保存とコミット**：ワークフローはリポジトリ変数 `DIGEST_ENABLED` が `true` のときだけ動く。結果を `data/YYYY-MM-DD.json`（ブックマーク）と `data/sources/YYYY-MM-DD.json`（追加の情報源）に書き出し、`state/` を更新してmainにコミットする。新着が0件でも空のファイルを置く。
 7. **要約（7:00）**：ルーチンがmainをクローンし、当日のデータと本文を読んで、要点、図解、キーワードを作る。トピックはJevの分類結果をそのまま使う。
-8. **検証・公開（別環境）**：信頼した公開担当が生成されたJSONを検証し、テンプレートHTMLの `report-data` ブロックだけを差し替え、`config/report.json` の `artifact_url` のアーティファクトに公開し直す（空なら初回だけ担当者が新しく作り、URLを設定する）。同じHTMLを `reports/YYYY-MM-DD.html` として `claude/reports` ブランチにもpushする。
+8. **検証・公開（別環境、Claude）**：信頼した公開担当が生成されたJSONを検証し、テンプレートHTMLの `report-data` ブロックだけを差し替え、`config/report.json` の `artifact_url` のアーティファクトに公開し直す（空なら初回だけ担当者が新しく作り、URLを設定する）。同じHTMLを `reports/YYYY-MM-DD.html` として `claude/reports` ブランチにもpushする。
+
+Codexは [CODEX.md](../CODEX.md) を入口として同じ要約手順を実行する。
+検証後に実行タスクの結果チャットへ総括・まず読む3件・情報源の状況を載せる。
+ファイル受け渡し機能があればHTML・JSONを渡し、なければ全掲載項目の要約を本文に載せ、ファイルの受け渡しは未完了と報告する。
+Codexは `artifact_url` を参照しない。別の公開担当がHTMLを組み立て直し、履歴とキャッシュを `codex/reports` に保存する。
 
 推移グラフ用の件数は、ルーチンが `data/` 配下の日別ファイルの件数を数えて作る。
 
@@ -217,7 +223,7 @@ X Engineering Blog は GitHub Actions からの取得が 403 になり、2023年
 - どのブログも、公開日が3日以内の記事だけを新着とする（1ブログ10件まで）。情報源によって期間がずれないようにするため（2026-10-04 に変更。それまでは一覧ページのブログは初回を既読の記録だけにしていたので、Anthropic が初日に「更新なし」になっていた）。
 - 一覧やフィードに公開日がない記事（Anthropic、Google Developers Blog など）は、記事の本文を取って公開日を読む（1ブログ10件まで）。取った本文は `data/articles/` に保存し、本文取得の手順で使い回す。
 - それでも公開日がわからない記事は、そのブログの初回だけ新着にしない（過去の記事を一度に新着扱いしないため）。2回目以降は前回の一覧との差分なので新着にする。
-- ランキング系（GitHub、Qiita、Zenn、DevelopersIO）は毎日その日の上位を取得する。前日にも載っていた項目は「連続◯日目」の印を付け、前日の要約を再利用する（`claude/reportsブランチの summaries/` にURL単位で保存）。
+- ランキング系（GitHub、Qiita、Zenn、DevelopersIO）は毎日その日の上位を取得する。前日にも載っていた項目は「連続◯日目」の印を付け、前日の要約を再利用する（`実行者に対応する履歴ブランチの summaries/` にURL単位で保存）。
 
 ### 要約の深さ
 
@@ -261,10 +267,10 @@ data/YYYY-MM-DD.json          日別の新着ブックマーク
 data/sources/YYYY-MM-DD.json  日別の追加の情報源
 data/excluded/YYYY-MM-DD.json テック判定で除外した項目
 data/articles/<key>.json      記事・README・ブログの本文（URLのハッシュ単位）
-summaries/<key>.json          要約のキャッシュ（claude/reportsブランチ）
+summaries/<key>.json          要約のキャッシュ（Claude: claude/reports、Codex: codex/reports）
 template/report.html          レポートのテンプレート（サンプルデータ入り）
 ROUTINE.md                    ルーチンの手順書（プロンプト本体）
-reports/YYYY-MM-DD.html       過去のレポート（claude/reportsブランチ）
+reports/YYYY-MM-DD.html       過去のレポート（Claude: claude/reports、Codex: codex/reports）
 AGENTS.md, docs/              コーディングエージェント向けの案内、設計・データ・命名規則・変更手順
 ```
 
@@ -449,7 +455,7 @@ Secretsのほかに、リポジトリ変数 `DIGEST_ENABLED`（`true` で取得�
 ## ルーチン設定
 
 ルーチンは資料を読み、report-dataと要約キャッシュをローカルに出力する。公開は別の信頼した担当者がPUBLISH.mdに従って行う。
-要約側を読み取り専用にし、Git書き込み資格情報・Artifactツールを与えない。公開側は保存先を `claude/reports` と設定済みのアーティファクトに限定する。
+要約側を読み取り専用にし、Git書き込み資格情報・Artifactツールを与えない。公開側はClaudeなら `claude/reports` と固定アーティファクト、Codexなら `codex/reports` に限定する。
 これらの制限は実行環境側で設定する必要がある。設定できない場合は担当者が手動で公開する。外部サイトへの接続やコネクタは使わない。
 
 | 設定項目 | 値 | 理由 |
@@ -463,6 +469,11 @@ Secretsのほかに、リポジトリ変数 `DIGEST_ENABLED`（`true` で取得�
 | コネクタ | すべて外す | 誤って外部に書き込む経路をなくす |
 | 公開担当の更新先 | 設定済みのアーティファクト（1つ） | 要約側に公開権限を与えない |
 
+Codex Cloud の環境準備と結果の受け渡しは [CODEX.md](../CODEX.md) に従う。
+毎日7:00 Asia/Tokyoの起動は別途設定する。このリポジトリはスケジュール登録を行わない。
+Cloud環境を定期起動できるかは利用中のアカウントで確認する。取得層のAPI呼び出し回数は変わらない。
+Codexの要約にかかる利用枠・料金はCodex側の契約と実行方法に従う。
+
 ### プロンプト（ROUTINE.md）に必ず含める指示
 
 1. 当日の `data/YYYY-MM-DD.json` と `data/sources/YYYY-MM-DD.json` がどちらもなければ、「本日のデータなし」のレポートを出して終了する。片方だけなら、ある方でレポートを作る。
@@ -470,7 +481,7 @@ Secretsのほかに、リポジトリ変数 `DIGEST_ENABLED`（`true` で取得�
 3. トピックはJevの分類結果をそのまま使い、独自のテーマを作らない。Jevの結果が空の項目だけ、トピック一覧から選んで分類する。
 4. テック判定が保留（`hold`）の項目は、内容を読んでテック系かどうかを決める。テック系でなければ除外リストに移す。
 5. 記事の内容と引用元の主張を書き分け、投稿者の意見は載せない。
-6. 情報源ごとに決めた要約の深さを守る。前日にも載っていたランキング項目は、`claude/reportsブランチの summaries/` の要約を再利用する。
+6. 情報源ごとに決めた要約の深さを守る。前日にも載っていたランキング項目は、`実行者に対応する履歴ブランチの summaries/` の要約を再利用する。
 7. 図解の数値は資料に書かれているものだけを使い、なければ数値を使わない種類の図にする。
 8. キーワードは既存レポートの表記に合わせる（直近のレポートのキーワード一覧を参照する）。
 9. `template/report.html` の `report-data` ブロックだけを書き換え、ほかの部分は変更しない。

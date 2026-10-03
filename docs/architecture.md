@@ -5,9 +5,9 @@
 | 層 | 実行場所 | 外部との通信 | 秘密情報 | 書くもの |
 | --- | --- | --- | --- | --- |
 | 取得層 | GitHub Actions（`.github/workflows/fetch.yml`、6:00 JST） | X API、各サイト、GitHub API、TypeSafe AI | X・TypeSafe・GH_PAT（Secrets） | main の `data/`、`state/` |
-| 要約層 | Claude Code のルーチン（7:00 JST、Sonnet） | なし（入力を読み取り専用で渡す） | なし | ローカルのreport-dataと要約キャッシュ |
-| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | Git・Artifactのみ | 公開先だけの権限 | アーティファクト、`claude/reports` ブランチ |
-| 表示層 | claude.ai のアーティファクト | cdnjs の d3 だけ | なし | 閲覧者のブラウザの localStorage（既読） |
+| 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | なし（入力を読み取り専用で渡す） | なし | ローカルのreport-dataと要約キャッシュ |
+| 公開担当 | 要約とは別の信頼した環境（PUBLISH.md） | Git・Artifactのみ | 公開先だけの権限 | Claude: 固定アーティファクトと `claude/reports`。Codex: `codex/reports` |
+| 表示層 | Claude のアーティファクト、または Codex の結果チャット・HTMLファイル | cdnjs の d3 だけ | なし | 閲覧者のブラウザの localStorage（既読） |
 
 この分け方の理由: 外部の文章（記事本文など）には Claude への指示が紛れ込みうる。要約層からコネクタと秘密情報を外すことで、操作可能な範囲を狭める。
 ただしプロンプトだけでは権限を制限できず、Git・Artifactの書き込み権限があれば不正な更新のリスクが残る。
@@ -40,7 +40,11 @@
 生成側にはGit書き込み資格情報・Artifactツールを与えない。権限制限は実行環境側で設定する必要があり、
 このリポジトリの手順書だけでは強制できない。制限できない環境では担当者が手動で公開する。
 
-ランキングで前日にも載った項目は、`claude/reports` の `summaries/<article_key>.json` を再利用して利用枠を節約する。
+実行者は信頼したタスク設定で選ぶ。Codex は [CODEX.md](../CODEX.md) を入口とし、
+検証済みレポートを実行したタスクの結果チャットに渡す。ファイル受け渡し機能がなければ本文に要約を載せる。
+Claude の `artifact_url` は使わない。外部公開と履歴保存は引き続き別の公開担当が行う。
+
+ランキングで前日にも載った項目は、Claude は `claude/reports`、Codex は `codex/reports` の `summaries/<article_key>.json` を再利用して利用枠を節約する。
 
 ## 表示層
 

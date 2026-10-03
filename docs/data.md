@@ -101,4 +101,12 @@ Qiita の項目と公式ブログの項目は、フィードの概要を `summar
 | `topics.json` | トピック一覧。ID と並び順は固定（レポートの色が並び順で決まる）。`description` は Jev の選択肢の説明（英語） |
 | `sources.json` | 情報源の URL、CSS セレクタ、ブログの一覧、新着の規則、User-Agent |
 | `jev.json` | Jev のモデル、しきい値、問いの文面（英語）、state に入れる文字数 |
-| `report.json` | ルーチンが上書きするアーティファクトの URL（各自のリポジトリで設定する） |
+| `report.json` | Claude の公開担当が更新する固定アーティファクトの URL（各自のリポジトリで設定する）。Codex は使わない |
+
+## レポートの届け先と履歴
+
+report-data の形は両実行者で共通。届け先を report-data に含めない。
+Claude は固定アーティファクト、Codex は実行した Cloud タスクの結果チャットへ届ける。
+履歴の `reports/YYYY-MM-DD.html` と `summaries/<article_key>.json` は、公開担当が
+Claude なら `claude/reports`、Codex なら `codex/reports` に保存する。
+要約側には実行者に対応する履歴を読み取り専用で渡す。
