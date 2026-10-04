@@ -27,11 +27,10 @@ check: lint typecheck test ## コミット前に必ず通す（lint + 型 + テ�
 	python3 scripts/report_tools.py validate template/report.html
 
 try: ## 実際のサイトから取得して試す（X は呼ばない。出力は TRY_DIR。TYPESAFE_API_KEY があれば Jev も呼ぶ）
-	@case "$(abspath $(TRY_DIR))/" in "$(CURDIR)/"*) echo "TRY_DIR をリポジトリの中にしないでください（data/ と state/ を壊さないため）"; exit 1;; esac
-	rm -rf $(TRY_DIR) && mkdir -p $(TRY_DIR)/state
-	DIGEST_ROOT=$(TRY_DIR) uv run python -m scripts.fetch_sources
-	DIGEST_ROOT=$(TRY_DIR) uv run python -m scripts.fetch_articles
-	DIGEST_ROOT=$(TRY_DIR) uv run python -m scripts.classify_jev
+	python3 scripts/prepare_try.py "$(TRY_DIR)"
+	DIGEST_ROOT="$(TRY_DIR)" uv run python -m scripts.fetch_sources
+	DIGEST_ROOT="$(TRY_DIR)" uv run python -m scripts.fetch_articles
+	DIGEST_ROOT="$(TRY_DIR)" uv run python -m scripts.classify_jev
 	@echo "結果: $(TRY_DIR)/data/"
 
 preview: ## サンプルデータ入りのレポートをブラウザで開く
