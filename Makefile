@@ -1,5 +1,5 @@
 # よく使うコマンド。迷ったら make help
-.PHONY: help setup fmt lint typecheck test check try preview
+.PHONY: help setup fmt lint typecheck test check try preview shots icons
 
 TRY_DIR ?= /tmp/x-bookmark-digest-try
 
@@ -36,3 +36,9 @@ try: ## 実際のサイトから取得して試す（X は呼ばない。出力�
 
 preview: ## サンプルデータ入りのレポートをブラウザで開く
 	open template/report.html || xdg-open template/report.html
+
+shots: ## テンプレートの見た目をヘッドレス Chrome で撮る（幅3種・ダーク。出力は /tmp/x-bookmark-digest-shots）
+	python3 scripts/take_screenshots.py
+
+icons: ## template/icons/ のロゴをテンプレートに埋め込み直す
+	python3 scripts/embed_icons.py

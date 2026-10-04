@@ -30,7 +30,7 @@ make check
 - なければ `"kind": "page"`、一覧ページの `url`、記事の href に一致する `link_pattern`（正規表現）、相対 URL を解決する `base_url`。
   `link_pattern` はカテゴリや一覧のページに一致しないようにする（記事の URL に年や slug が入る形を狙う）。
 - `company` が同じブログは、レポートで1つの見出しにまとまる。
-- 新しい `company` のアイコンは、既定では青い四角に頭文字が入る。ロゴを使うときは、80px の画像を `template/icons/<company>.png`（または `.jpg`）に置き、同じ画像を data URI にした `.av.org[data-co="<company>"]` の行を `template/report.html` に足す（`make check` で食い違いを検出する）。
+- 新しい `company` のアイコンは、既定では青い四角に頭文字が入る。ロゴを使うときは、80px の画像を `template/icons/<company>.png`（または `.jpg`）に置き、`make icons` でテンプレートに埋め込む（埋め込み忘れは `make check` で検出する）。
 - `make try` で、公開日が3日以内の記事だけが新着になることと、`state/seen_urls.json` に記事の URL が入ることを確かめる（一覧やフィードに日付がない記事は本文から日付を読む）。
 - robots.txt で禁止されていないことを確かめる。README の「費用の試算」と「1日あたりの外部への呼び出し」を更新する。
 
@@ -53,7 +53,7 @@ make check
 
 1. `template/report.html` を直す。データ中の文字列は `el(tag, attrs, text)`（textContent）で入れ、innerHTML を使わない。リンクは `safeUrl` / `link` を通す
 2. 色はトークン（`--ink`、`--blue` など）だけを使い、強調色は `--blue` にそろえる。企業と情報源のロゴ（`.av.org[data-co]`、元画像は `template/icons/`）だけは例外。ライトとダークの両方の値を `:root` と2つのダークのブロックに書く
-3. `make preview` で見た目を確かめる（サンプルデータで、スマホ幅とダークモードも）
+3. `make shots` で見た目を確かめる（サンプルデータを、幅の広い画面・中くらいの画面・スマホ幅とダークモードで撮る。ブラウザーで触るなら `make preview`）
 4. `make check`（テンプレートのサンプルデータの検証を含む）
 
 ## report-data に項目を足す
