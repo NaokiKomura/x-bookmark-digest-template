@@ -223,3 +223,53 @@ def test_validate_checks_carryover():
     )
     four = [{"date": f"2026-09-2{i}"} for i in range(4)]
     assert any("3日分まで" in e for e in rt.validate_data({**data, "carryover": four}))
+
+
+def test_archive_indexes_the_previous_fourteen_days(tmp_path):
+    base = {k: v for k, v in sample().items() if k not in ("carryover", "archive")}
+    for day in ("2026-10-19", "2026-10-06", "2026-10-05"):
+        write_report(tmp_path, day, base)
+    archive = rt.cmd_archive("2026-10-20", tmp_path)
+    # 14日前（10/06）までは入り、15日前（10/05）は入らない。新しい日が先
+    assert [a["date"] for a in archive] == ["2026-10-19", "2026-10-06"]
+    rows = {row["id"]: row for row in archive[0]["items"]}
+    post = base["posts"][0]
+    assert rows[post["id"]] == {
+        "id": post["id"],
+        "source": "bookmarks",
+        "title": post["title"],
+        "url": post["url"],
+        "theme": post["theme"],
+        "label": "@" + post["handle"],
+        "note": post["points"][0],
+    }
+    article = base["articles"][0]
+    assert rows[article["id"]]["source"] == article["site"]
+    assert rows[article["id"]]["note"] == article["summary"]
+    assert rt.validate_archive(archive, "2026-10-20") == []
+
+
+def test_archive_skips_carried_items_and_bad_rows(tmp_path):
+    data = {k: v for k, v in sample().items() if k != "archive"}
+    write_report(tmp_path, "2026-10-08", {**data, "carryover": []})
+    html = tmp_path / "2026-10-08.html"
+    broken = rt.extract_data(html.read_text())
+    broken["posts"][0]["url"] = "javascript:alert(1)"
+    broken["posts"][1]["theme"] = "not_a_topic"
+    html.write_text(
+        rt.BLOCK.sub(lambda m: m.group(1) + rt.embed(broken) + m.group(3), html.read_text())
+    )
+    rows = {r["id"]: r for r in rt.cmd_archive("2026-10-09", tmp_path)[0]["items"]}
+    assert rows[data["posts"][0]["id"]]["url"] == ""
+    assert data["posts"][1]["id"] not in rows
+
+
+def test_validate_checks_archive():
+    data = sample()
+    assert data["archive"], "サンプルに archive がない"
+    assert rt.validate_data(data) == []
+    data["archive"][0]["date"] = data["date"]
+    data["archive"][0]["items"][0]["url"] = "http://example.com"
+    errors = rt.validate_data(data)
+    assert any("archive.date" in e for e in errors)
+    assert any("https://" in e for e in errors)

@@ -8,6 +8,7 @@ python3 scripts/report_tools.py keywords [--reports DIR]      直近のレポー
 python3 scripts/report_tools.py build   DATA.json OUT.html    テンプレートの report-data だけを差し替える
 python3 scripts/report_tools.py validate OUT.html             差し替えたHTMLを検証する（公開の前に必ず通す）
 python3 scripts/report_tools.py carryover YYYY-MM-DD [--reports DIR]  前日から3日前までのレポートの項目（report-data の carryover）
+python3 scripts/report_tools.py archive YYYY-MM-DD [--reports DIR]    前日から14日前までのレポートの索引（report-data の archive）
 """
 
 from __future__ import annotations
@@ -34,6 +35,9 @@ MAX_READ_MIN = 15
 CARRY_DAYS = 3
 """未読の項目を翌日以降のレポートに繰り越す日数（元の日から数える）。"""
 CARRY_SECTIONS = ("posts", "blogs", "github", "articles")
+ARCHIVE_DAYS = 14
+"""「過去の日報」に索引を載せる日数（前日から数える）。"""
+ARCHIVE_NOTE_CHARS = 120
 DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
@@ -173,6 +177,107 @@ def cmd_carryover(day: str, reports_dir: Path) -> list[dict[str, Any]]:
         if any(entry[section] for section in CARRY_SECTIONS):
             out.append(entry)
     return out
+
+
+# ---------- 過去の日報 ----------
+
+
+def to_archive_item(section: str, item: dict[str, Any]) -> dict[str, Any] | None:
+    """レポートの1項目を、索引の1行（見出し・リンク・出どころ・トピック・短い要点）にする。"""
+    title, item_id = item.get("title"), item.get("id")
+    if not isinstance(title, str) or not title or not isinstance(item_id, str) or not item_id:
+        return None
+    if section == "posts":
+        source, label = "bookmarks", "@" + str(item.get("handle", ""))
+    elif section == "blogs":
+        source, label = "blogs", str(item.get("company_label") or item.get("company") or "")
+    elif section == "github":
+        source, label = "github", str(item.get("language") or "")
+    else:
+        source, label = str(item.get("site", "")), ""
+    points = item.get("points")
+    note = points[0] if isinstance(points, list) and points else item.get("summary")
+    url = item.get("url")
+    out: dict[str, Any] = {
+        "id": item_id,
+        "source": source,
+        "title": title,
+        "url": url if isinstance(url, str) and url.startswith("https://") else "",
+        "theme": item.get("theme"),
+    }
+    if label:
+        out["label"] = label
+    if section == "blogs" and isinstance(item.get("company"), str):
+        out["company"] = item["company"]
+    if isinstance(note, str) and note:
+        out["note"] = note[:ARCHIVE_NOTE_CHARS]
+    return out
+
+
+def cmd_archive(day: str, reports_dir: Path) -> list[dict[str, Any]]:
+    """前日から ARCHIVE_DAYS 日前までのレポートの索引。新しい日が先。
+
+    レポートがない日、日付が合わない日、索引の形にならない項目は飛ばす。各日の繰り越し分は含めない。
+    """
+    end = date.fromisoformat(day)
+    topic_ids = {t["id"] for t in load_topics()}
+    out: list[dict[str, Any]] = []
+    for i in range(1, ARCHIVE_DAYS + 1):
+        d = (end - timedelta(days=i)).isoformat()
+        path = reports_dir / f"{d}.html"
+        if not path.is_file():
+            continue
+        data = extract_data(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("date") != d:
+            continue
+        items = []
+        for section in CARRY_SECTIONS:
+            for item in data.get(section) or []:
+                row = to_archive_item(section, item) if isinstance(item, dict) else None
+                if row and not archive_item_errors(row, topic_ids):
+                    items.append(row)
+        if items:
+            out.append({"date": d, "items": items})
+    return out
+
+
+def archive_item_errors(row: Any, topic_ids: set[str]) -> list[str]:
+    if not isinstance(row, dict):
+        return ["項目がオブジェクトでない"]
+    errors = []
+    if not isinstance(row.get("id"), str) or not row["id"]:
+        errors.append("id がない")
+    if row.get("source") not in SOURCE_NAMES:
+        errors.append(f"source が不明: {row.get('source')}")
+    if not isinstance(row.get("title"), str) or not row["title"]:
+        errors.append("title がない")
+    url = row.get("url")
+    if not isinstance(url, str) or (url and not url.startswith("https://")):
+        errors.append("url は https:// で始まる文字列か空文字")
+    if row.get("theme") not in topic_ids:
+        errors.append(f"theme が不明: {row.get('theme')}")
+    for key in ("label", "note", "company"):
+        if key in row and not isinstance(row[key], str):
+            errors.append(f"{key} が文字列でない")
+    return errors
+
+
+def validate_archive(archive: Any, day: str) -> list[str]:
+    """archive は任意。当日より前の日ごとに、索引の行（to_archive_item の形）を持つ。"""
+    if not isinstance(archive, list) or len(archive) > ARCHIVE_DAYS:
+        return [f"archive は{ARCHIVE_DAYS}日分までの配列"]
+    topic_ids = {t["id"] for t in load_topics()}
+    errors: list[str] = []
+    for entry in archive:
+        if not isinstance(entry, dict) or not isinstance(entry.get("items"), list):
+            errors.append("archive の要素は date と items を持つオブジェクト")
+            continue
+        d = str(entry.get("date", ""))
+        if not DATE_RE.fullmatch(d) or d >= day:
+            errors.append(f"archive.date は当日より前の YYYY-MM-DD: {d}")
+        for row in entry["items"]:
+            errors += [f"archive {d}: {e}" for e in archive_item_errors(row, topic_ids)]
+    return errors
 
 
 # ---------- 組み立てと検証 ----------
@@ -397,6 +502,7 @@ def validate_data(data: Any) -> list[str]:
         "pick_reasons は picks のIDをキーとする空でない文字列のオブジェクト",
     )
     errors += validate_carryover(data.get("carryover", []), str(data["date"]))
+    errors += validate_archive(data.get("archive", []), str(data["date"]))
     return errors
 
 
@@ -452,6 +558,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("carryover")
     p.add_argument("date")
     p.add_argument("--reports", default="reports")
+    p = sub.add_parser("archive")
+    p.add_argument("date")
+    p.add_argument("--reports", default="reports")
     args = parser.parse_args(argv)
 
     if args.cmd == "inputs":
@@ -465,6 +574,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"wrote {args.out}")
     elif args.cmd == "carryover":
         print(json.dumps(cmd_carryover(args.date, Path(args.reports)), ensure_ascii=False))
+    elif args.cmd == "archive":
+        print(json.dumps(cmd_archive(args.date, Path(args.reports)), ensure_ascii=False))
     elif args.cmd == "validate":
         errors = cmd_validate(Path(args.html))
         if errors:

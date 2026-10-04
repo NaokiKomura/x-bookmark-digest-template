@@ -246,7 +246,13 @@ body.leaf .theme-head,body.leaf .company>h3,body.leaf #sec-github .sec-head,body
 .streak{font-size:12px;font-weight:700;color:var(--ink2);background:var(--paper);border-radius:4px;padding:0 6px}
 .company h3{display:flex;align-items:center;gap:10px}
 .company h3 .av{width:24px;height:24px;font-size:12px;border-radius:6px}
-.carry-group>h3,.company h3,.col h3{font-size:17px;font-weight:800;margin:0 -16px;padding:14px 16px 4px}
+.arch-list{list-style:none;margin:0;padding:0}
+.arch-row{display:grid;grid-template-columns:20px minmax(0,1fr);gap:0 12px;margin:0 -16px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.arch-row:hover{background:var(--hover)}
+.arch-row .av{margin-top:3px}
+.arch-row .gsum{margin:2px 0 4px}
+.arch-row.is-read .rt{color:var(--ink2)}
+.arch-day>h3,.carry-group>h3,.company h3,.col h3{font-size:17px;font-weight:800;margin:0 -16px;padding:14px 16px 4px}
 .carry-group{margin-top:0}
 .item.is-read h4,.item.is-read .rt{color:var(--ink2)}
 .company .none{font-size:14px;color:var(--ink2);margin:0 -16px;padding:4px 16px 12px;border-bottom:1px solid var(--line)}
@@ -489,6 +495,12 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     <div id="carry"></div>
   </section>
 
+  <section id="sec-archive" hidden>
+    <div class="sec-head"><h2>過去の日報</h2><span class="n" id="n-archive"></span></div>
+    <p class="sub">直近14日のレポートの見出しです。今日の一覧・前日までの未読にあるものは除いています。</p>
+    <div id="archive-days"></div>
+  </section>
+
   <section id="sec-saved" hidden><p class="sub">保存した項目は、掲載日が過ぎてもこのブラウザーに残ります。既読とは別に管理できます。</p><div id="saved-items"></div></section>
 
   <p class="empty" id="empty" hidden>この条件に当てはまる項目はありません。</p>
@@ -638,6 +650,18 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
    "articles": [
     {"id": "cq1", "site": "zenn", "rank": 5, "title": "（前日の未読サンプル）型の境界でバリデーションを一か所にまとめる", "url": "https://zenn.dev/", "theme": "backend", "streak_days": 1, "summary": "入力の検証を API の境界に集めて、内側の関数では型を信じる設計の紹介。"}
    ]}
+ ],
+ "archive": [
+  {"date": "2026-10-02", "items": [
+   {"id": "c1", "source": "bookmarks", "title": "（前日の未読サンプル）差分の小さいコミットはレビューの往復を減らす", "url": "https://x.com/mori_dev/status/1839700000000000001", "theme": "devtools", "label": "@mori_dev", "note": "1つのコミットに1つの目的を入れる"},
+   {"id": "a1", "source": "bookmarks", "title": "（過去のサンプル）評価セットは失敗した入力から育てる", "url": "https://x.com/eval_tanaka/status/1839700000000000005", "theme": "llm_agents", "label": "@eval_tanaka", "note": "本番で外した入力を週に1度まとめて追加する"},
+   {"id": "a2", "source": "blogs", "title": "（過去のサンプル）ツール呼び出しの結果を短くして文脈を節約する", "url": "https://www.anthropic.com/engineering", "theme": "llm_agents", "label": "Anthropic", "company": "anthropic", "note": "大きな出力は要約とファイルへの書き出しに分ける"},
+   {"id": "a3", "source": "github", "title": "example/cron-guard", "url": "https://github.com/trending", "theme": "devops", "label": "Go", "note": "定期ジョブの遅れと二重起動を検知するツール。"}
+  ]},
+  {"date": "2026-10-01", "items": [
+   {"id": "a4", "source": "zenn", "title": "（過去のサンプル）キャッシュの無効化を設計の最初に決める", "url": "https://zenn.dev/", "theme": "backend", "note": "どのイベントでどのキーを消すかを表にしてから実装する。"},
+   {"id": "a5", "source": "qiita", "title": "（過去のサンプル）GitHub Actions の権限を最小にする", "url": "https://qiita.com/", "theme": "security", "note": "permissions をジョブごとに書き、既定の書き込み権限を外す。"}
+  ]}
  ]
 }
 </script>
@@ -1453,6 +1477,37 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   });
   var allItems = items.concat(carried, retained);
 
+  // ---------- 過去の日報（索引） ----------
+  // ルーチンが前日から14日前までのレポートの見出しを archive に入れる。今日・繰り越し・保存と重なるものは出さない
+  function dayLabel(d){ var x = d.split('-').map(Number), w = new Date(x[0], x[1]-1, x[2]).getDay(); return x[1] + '月' + x[2] + '日（' + wd[w] + '）'; }
+  function archAvatar(it){
+    if (it.source === 'blogs') return avatar(it.label || '', it.company || 'blog', true);
+    if (it.source === 'bookmarks') return avatar((it.label || '').replace('@', ''), null, true);
+    return avatar(SRC[it.source], it.source, true);
+  }
+  var archRows = [], archBox = document.getElementById('archive-days'), archDayEls = [];
+  (D.archive || []).forEach(function(day){
+    var rows = (day.items || []).filter(function(it){ return it && it.id && it.title && !byId[it.id]; });
+    if (!rows.length) return;
+    var box = el('div', {'class': 'arch-day'}), ul = el('ul', {'class': 'arch-list'});
+    box.appendChild(el('h3', null, dayLabel(day.date)));
+    rows.forEach(function(it){
+      var li = el('li', {'class': 'arch-row'}), body = el('div', {'class': 'arch-main'});
+      li.appendChild(archAvatar(it));
+      var t = el('div', {'class': 'rt'}); t.appendChild(link(it.url, it.title)); body.appendChild(t);
+      if (it.note) body.appendChild(el('p', {'class': 'gsum'}, it.note));
+      var m = el('div', {'class': 'gmeta'});
+      m.appendChild(el('span', null, (SRC[it.source] || '') + (it.label ? '・' + it.label : '')));
+      if (tName[it.theme]) m.appendChild(el('span', null, tName[it.theme]));
+      body.appendChild(m); li.appendChild(body); ul.appendChild(li);
+      li._it = it; li._text = [it.title, it.note, it.label, SRC[it.source], tName[it.theme]].filter(Boolean).join(' ').toLowerCase();
+      archRows.push(li);
+    });
+    box.appendChild(ul); archBox.appendChild(box); archDayEls.push(box);
+  });
+  document.getElementById('n-archive').textContent = archRows.length + '件';
+  function archMatches(li){ return terms().every(function(t){ return li._text.indexOf(t) >= 0; }); }
+
   // ---------- 推移グラフ ----------
   var tr = D.trend || [], tsvg = document.getElementById('trend');
   if (tr.length) {
@@ -1494,6 +1549,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     : (D.blogs || []).reduce(function(a, b){ if (!a.some(function(c){ return c.company === b.company; })) a.push({company: b.company, label: b.company_label, status: 'ok'}); return a; }, []);
   var NAV = [{view: 'overview', label: '概要', top: true}, {view: 'all', label: '今日の一覧', top: true}, {view: 'saved', label: 'あとで読む', top: true}];
   if (carried.length) NAV.push({view: 'co', label: '前日までの未読', top: true});
+  if (archRows.length) NAV.push({view: 'archive', label: '過去の日報', top: true});
   NAV.push({view: 'bm', label: 'ブックマーク', top: true, grp: true, status: statusBy.bookmarks && statusBy.bookmarks.status});
   themeIds.forEach(function(id){ if ((D.posts || []).some(function(p){ return p.theme === id; })) NAV.push({view: 'bm:' + id, label: tName[id], theme: id}); });
   // 初回セットアップで外した情報源はデータに出てこないので、サイドバーにも出さない
@@ -1514,7 +1570,8 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     co: ['M3.5 12a8.5 8.5 0 1 0 2.5-6', 'M3.5 4v4.5H8', 'M12 7.5V12l3 2'],
     bm: ['M4 4.5h16v11H9l-5 4z', 'M8.5 9h7', 'M8.5 12h4.5'],
     blog: ['M5 3.5h10l4 4v13H5z', 'M14.5 3.5v4.5H19', 'M8.5 12h7', 'M8.5 16h7'],
-    tr: ['M3.5 17.5 9 12l3.5 3.5 8-8', 'M15 7.5h5.5V13']
+    tr: ['M3.5 17.5 9 12l3.5 3.5 8-8', 'M15 7.5h5.5V13'],
+    archive: ['M4 6h16v14H4z', 'M4 10.5h16', 'M8.5 3.5v5', 'M15.5 3.5v5']
   };
   function navIcon(view){
     var s = sv('svg', {'class': 'ic', 'viewBox': '0 0 24 24', 'aria-hidden': 'true'});
@@ -1539,6 +1596,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
       n.btn.setAttribute('aria-current', state.view === n.view ? 'page' : 'false');
       n.cnt.textContent = ''; n.cnt.className = 'cnt';
       if (n.view === 'overview') return;
+      if (n.view === 'archive') { n.cnt.textContent = archRows.length + '件'; return; }
       var list = allItems.filter(function(p){ return inView(p, n.view); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       if (!list.length) { n.cnt.textContent = n.status === 'error' ? '取得失敗' : n.view === 'saved' ? '0件' : '更新なし'; if (n.status === 'error') n.cnt.classList.add('err'); return; }
       if (!unread) { n.cnt.textContent = '✓ ' + list.length; n.cnt.classList.add('done'); return; }
@@ -1633,7 +1691,8 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     unreadBtn.setAttribute('aria-pressed', String(state.unread));
     freshBtn.setAttribute('aria-pressed', String(state.fresh));
     if (document.activeElement !== qInput) qInput.value = state.query;
-    qCount.textContent = state.query ? allItems.filter(matchesQuery).length + '件見つかりました' : '';
+    var archHits = state.query ? archRows.filter(archMatches).length : 0;
+    qCount.textContent = state.query ? (allItems.filter(matchesQuery).length + archHits) + '件見つかりました' + (archHits ? '（過去の日報 ' + archHits + '件を含む）' : '') : '';
     kwBtns.forEach(function(b){ b.classList.toggle('on', b._k === state.keyword); });
     if (mapDetail.firstChild) { var cur = topicStats.filter(function(t){ return tmEls[t.id] && tmEls[t.id].classList.contains('on'); })[0]; if (cur) showTopic(cur); }
 
@@ -1659,6 +1718,17 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
       var own = v === g._key || v === g._key.split(':')[0];
       g.hidden = !(any || (own && !g._list.length));
     });
+    // 過去の日報は「過去の日報」と検索でだけ出す
+    var archShown = 0;
+    archRows.forEach(function(li){
+      var vis = (v === 'archive' || (v === 'search' && archMatches(li))) && !(state.unread && read[li._it.id]) && !state.fresh;
+      li.hidden = !vis; if (vis) archShown++;
+      li.classList.toggle('is-read', !!read[li._it.id]);
+    });
+    archDayEls.forEach(function(b){ b.hidden = !Array.prototype.some.call(b.querySelectorAll('.arch-row'), function(li){ return !li.hidden; }); });
+    var secArch = document.getElementById('sec-archive');
+    secArch.hidden = !archShown && v !== 'archive'; secArch.classList.toggle('solo', v === 'archive');
+    shown += archShown;
     [['sec-bookmarks', 'bm'], ['sec-blogs', 'blog'], ['sec-trends', 'tr'], ['sec-carry', 'co'], ['sec-saved', 'saved']].forEach(function(s){
       var sec = document.getElementById(s[0]);
       sec.hidden = !(groups.some(function(g){ return !g.hidden && sec.contains(g); }) || v === s[1]);
@@ -1691,7 +1761,11 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     var vm = document.getElementById('view-meta'); vm.textContent = '';
     if (!ov) {
       var list = allItems.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
-      vm.appendChild(document.createTextNode(shown + '件表示／全' + list.length + '件（未読 ' + unread + '件）'));
+      if (v === 'archive') vm.appendChild(document.createTextNode(shown + '件表示／全' + archRows.length + '件（直近' + (D.archive || []).length + '日分）'));
+      else {
+        var archTotal = v === 'search' ? archRows.filter(archMatches).length : 0;
+        vm.appendChild(document.createTextNode(shown + '件表示／全' + (list.length + archTotal) + '件（未読 ' + unread + '件' + (archTotal ? '・過去の日報 ' + archTotal + '件' : '') + '）'));
+      }
       if (state.unread || state.fresh) { var reset = el('button', {'type': 'button', 'class': 'clear'}, '表示条件を解除'); reset.addEventListener('click', function(){ changeState({unread: false, fresh: false}, {preserveScroll: true}); }); vm.appendChild(reset); }
       if (v === 'filter' || v === 'search') { var cl = el('button', {'type': 'button', 'class': 'clear'}, v === 'search' ? '検索をやめる' : '絞り込みを解除'); cl.addEventListener('click', function(){ setView('overview'); }); vm.appendChild(cl); }
       if (list.some(function(p){ return itemEls[p.id] && itemEls[p.id]._tg; })) {
