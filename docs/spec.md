@@ -17,7 +17,7 @@ Oct 3, 2026 · @古村直輝
 | 要約担当 | Claude Codeのルーチンを使えるプラン、またはCodex Cloudを利用できるアカウントと公開済み環境 |
 | GitHub | プライベートリポジトリ1つ。GitHub Actionsで取得と判定を動かす |
 | 情報源 | Xのブックマーク、GitHubトレンド、Qiita・Zenn・DevelopersIOのランキング、Anthropic・OpenAI・Google・AWSの公式テックブログ |
-| 実行時刻 | 取得と判定 5:00、要約 7:00（日本時間） |
+| 実行時刻 | 取得と判定 3:17、要約 7:00（日本時間） |
 | 利用者 | 本人のみ。レポートは共有しない前提 |
 
 ClaudeはAPIキーを使わず、サブスクの利用枠内で動かす。X APIとTypeSafe AIの認証情報はGitHub側だけに置き、Claude側には一切渡さない。
@@ -28,7 +28,7 @@ ClaudeはAPIキーを使わず、サブスクの利用枠内で動かす。X API
 
 ```mermaid
 flowchart LR
-  subgraph 取得層["取得層（GitHub Actions 5:00）"]
+  subgraph 取得層["取得層（GitHub Actions 3:17）"]
     X[X API] --> F[取得・本文抽出]
     W[外部サイト] --> F
     F --> J[Jev で判定]
@@ -49,7 +49,7 @@ X、外部サイト、TypeSafe AIに接続するのはGitHub Actionsだけ。Cla
 
 毎朝、取得（GitHub Actions）から要約（ルーチン）まで次の順に一方向で流れる。各段階の出力は次の段階の入力としてリポジトリに残る。
 
-1. **トークン更新（5:00）**：SecretsのリフレッシュトークンでX APIのアクセストークンを取得する。新しいリフレッシュトークンは、後続処理より先に `gh secret set` でSecretsへ書き戻す。
+1. **トークン更新（3:17）**：定期実行が毎時0分に混み合って遅れるのを避けるため、0分を外した早い時刻に始める（2026-10-04 に5:00から変更。この日は2時間43分遅れ、7:00の要約に間に合わなかった）。SecretsのリフレッシュトークンでX APIのアクセストークンを取得する。新しいリフレッシュトークンは、後続処理より先に `gh secret set` でSecretsへ書き戻す。
 2. **ブックマーク取得**：ブックマークAPIを1ページ20件でページ送りし、引用元の投稿とリンクの情報も展開して受け取る。`state/seen_ids.json` にある投稿に当たったら止め、新着だけを残す（X APIは返した件数ぶん課金されるため、ページを大きくしない）。
 3. **追加の情報源の取得**：GitHubトレンドの上位10リポジトリ、Qiita・Zenn・DevelopersIOのランキング上位、公式テックブログの新着を取得する（詳細は「追加の情報源」）。
 4. **本文の取得**：ブックマークのリンク先記事、ランキング記事、ブログ記事の本文と、リポジトリのREADMEを取得して `data/articles/` に保存する。
@@ -249,7 +249,7 @@ X Engineering Blog は GitHub Actions からの取得が 403 になり、2023年
 ### リポジトリ構成
 
 ```text
-.github/workflows/fetch.yml   取得と判定のワークフロー（5:00）
+.github/workflows/fetch.yml   取得と判定のワークフロー（3:17）
 .github/workflows/ci.yml      lint・型チェック・テスト
 scripts/fetch_bookmarks.py    トークン更新・ブックマーク取得・差分抽出
 scripts/fetch_sources.py      GitHubトレンド・ランキング・公式ブログの取得
@@ -462,7 +462,7 @@ Secretsのほかに、リポジトリ変数 `DIGEST_ENABLED`（`true` で取得�
 | 設定項目 | 値 | 理由 |
 | --- | --- | --- |
 | 作成場所 | claude.ai/code/routines | Proプランで利用できる |
-| トリガー | スケジュール、毎日 7:00（日本時間） | 取得の遅延を見込んで1時間空ける |
+| トリガー | スケジュール、毎日 7:00（日本時間） | 取得（3:17開始、1分ほどで終わる）の遅延を見込んで3時間以上空ける |
 | リポジトリ | 本システムのプライベートリポジトリ | mainから当日のデータを読む |
 | モデル | Sonnet | 要約には十分で、利用枠を節約できる |
 | 環境 | Default（ネットワークはTrusted） | 記事は取得済みなので外部接続は不要 |

@@ -1,10 +1,11 @@
 name: fetch
 
-# 取得と判定（毎朝 5:00 JST）。要約は 7:00 JST の Claude のルーチンが行う。
+# 取得と判定（毎朝 3:17 JST）。要約は 7:00 JST の Claude のルーチンが行う。
+# 定期実行は毎時0分に混み合って数時間遅れることがあるので、0分を避け、7:00 までの余裕を大きく取る。
 # X、外部サイト、TypeSafe AI に接続するのはこのワークフローだけ。
 on:
   schedule:
-    - cron: "0 20 * * *" # 毎日 05:00 JST
+    - cron: "17 18 * * *" # 毎日 03:17 JST
   workflow_dispatch:
     inputs:
       date:
