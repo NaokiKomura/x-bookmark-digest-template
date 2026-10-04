@@ -7,10 +7,32 @@
       "Bash(make typecheck)",
       "Bash(make fmt)",
       "Bash(make help)",
+      "Bash(make shots)",
       "Bash(uv run pytest:*)",
       "Bash(uv run ruff:*)",
       "Bash(uv run mypy:*)",
       "Bash(python3 scripts/report_tools.py:*)"
+    ],
+    "ask": [
+      "Bash(gh variable set:*)",
+      "Bash(gh secret set:*)",
+      "Bash(gh workflow run:*)",
+      "Bash(gh workflow enable:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.py\""
+          }
+        ]
+      }
     ]
   }
 }

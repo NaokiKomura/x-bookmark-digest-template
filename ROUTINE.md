@@ -197,11 +197,12 @@ for f in /tmp/report-summaries/*.json; do
 done
 git -C /tmp/reports-branch add reports summaries
 git -C /tmp/reports-branch commit -m "report: $DAY"
-git -C /tmp/reports-branch push origin "HEAD:refs/heads/$REPORT_BRANCH"
+git -C /tmp/reports-branch push origin HEAD:refs/heads/claude/reports
 ```
 
 履歴ブランチがまだない場合（手順1の `git fetch` が失敗した場合）は push せず、報告に「README の手順1の最後の行で `claude/reports` を作ってください」と書く。
-push が競合で断られたら、`git -C /tmp/reports-branch pull --rebase origin "$REPORT_BRANCH"` のあとで1回だけ push し直す。
+push が競合で断られたら、`git -C /tmp/reports-branch pull --rebase origin claude/reports` のあとで1回だけ push し直す。
+push 先は `HEAD:refs/heads/claude/reports` と明示する。クラウドのセッションでは、ほかのブランチへの push や送り先を省いた push はフック（`.claude/hooks/guard.py`）が止める。
 
 3. 最後に、作った件数（ブックマーク、ブログ、トレンド、除外）、Jev が unavailable だった件数、取得失敗の情報源、
    公開したアーティファクトの URL、履歴の push の結果を短く報告する。

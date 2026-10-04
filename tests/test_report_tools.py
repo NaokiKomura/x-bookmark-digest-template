@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 
 from scripts import report_tools as rt
 
@@ -10,6 +11,42 @@ def sample():
 
 def test_template_sample_is_valid():
     assert rt.validate_data(sample()) == []
+
+
+# テンプレートが読み込んでよい外部のファイル（AGENTS.md 守ること4）
+ALLOWED_LOADS = ("https://cdnjs.cloudflare.com/ajax/libs/d3/",)
+EXTERNAL_LOAD = re.compile(
+    r"""<(?:script|link|img|iframe|source|video|audio|embed|object)\b[^>]*?"""
+    r"""\b(?:src|href|data)\s*=\s*["']?((?:https?:)?//[^"'\s>]+)"""
+    r"""|url\(\s*["']?((?:https?:)?//[^"')\s]+)"""
+    r"""|@import\s+(?:url\()?\s*["']?([^"');\s]+)""",
+    re.I,
+)
+
+
+def external_loads(html: str) -> list[str]:
+    html = rt.BLOCK.sub("", html)  # report-data の URL は表示用のリンクで、読み込みではない
+    return [next(g for g in m.groups() if g) for m in EXTERNAL_LOAD.finditer(html)]
+
+
+def test_template_loads_nothing_but_d3():
+    loads = external_loads(rt.TEMPLATE.read_text(encoding="utf-8"))
+    assert loads, "d3 の読み込みが見つからない"
+    assert [u for u in loads if not u.startswith(ALLOWED_LOADS)] == []
+
+
+def test_external_loads_finds_fonts_images_and_imports():
+    html = (
+        '<link href="https://fonts.googleapis.com/css2?family=X" rel="stylesheet">'
+        '<img src="//example.com/a.png"><style>@import "https://x.test/a.css";'
+        ".a{background:url('https://x.test/b.png')}</style>"
+    )
+    assert external_loads(html) == [
+        "https://fonts.googleapis.com/css2?family=X",
+        "//example.com/a.png",
+        "https://x.test/a.css",
+        "https://x.test/b.png",
+    ]
 
 
 def test_company_icons_are_embedded_in_template():
