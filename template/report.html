@@ -239,8 +239,19 @@ body.leaf .theme-head,body.leaf .company>h3,body.leaf #sec-github .sec-head,body
 .savebtn:hover{color:var(--blue);background:rgba(29,155,240,.1)}
 .savebtn[aria-pressed="true"]{color:var(--blue);--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M6 3.5h12v17l-6-4.2-6 4.2z'/%3E%3C/svg%3E")}
 .readbtn:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+/* いいね・興味なし（アカウントに保存できるときだけ出す。翌朝のルーチンが「まず読む3件」の選び方に使う） */
+.readbtn.icon-only{padding:6px 9px;gap:0}
+.likebtn{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z'/%3E%3C/svg%3E")}
+.likebtn:hover{color:#F91880;background:rgba(249,24,128,.1)}
+.likebtn[aria-pressed="true"]{color:#F91880;--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='black' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z'/%3E%3C/svg%3E")}
+.dismissbtn{--ic:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12h8'/%3E%3C/svg%3E")}
+.dismissbtn:hover{color:var(--ink);background:var(--hover)}
+.dismissbtn[aria-pressed="true"]{color:var(--ink)}
+.item.is-dismissed h4,.item.is-dismissed .rt{color:var(--ink2);text-decoration:line-through;text-decoration-color:var(--line2)}
 @media (pointer:coarse){.readbtn{min-height:44px}}
 .item-actions .readbtn{margin-left:0}
+/* 狭い画面では X のアクションバーのように1行に均等に並べる */
+@media (max-width:600px){.item-actions{flex-basis:100%;flex-wrap:nowrap;justify-content:space-between;margin:2px 0 0}.item-actions .readbtn{padding-inline:8px}}
 .carried{font-size:12px;font-weight:700;color:var(--ink2);background:var(--paper);border-radius:4px;padding:0 6px}
 .fresh-tag{font-size:12px;font-weight:700;color:var(--blue-ink);background:color-mix(in srgb,var(--blue) 12%,transparent);border-radius:4px;padding:0 6px}
 .streak{font-size:12px;font-weight:700;color:var(--ink2);background:var(--paper);border-radius:4px;padding:0 6px}
@@ -704,6 +715,8 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   var KEY = 'xbm-read', LATER_KEY = 'xbm-later', read = {}, later = {};
+  // いいね・興味なし（アカウントに保存できるときだけ使う。下の「アカウントへの保存と端末間の同期」）
+  var feedback = {}, feedbackOn = false;
   function storageError(){
     var n = document.getElementById('storage-error'); n.hidden = false;
     n.textContent = '保存できません。このページを開いている間だけ操作が有効です。';
@@ -1217,9 +1230,21 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     });
     return b;
   }
+  function feedbackButton(p, vote){
+    var b = el('button', {'class': 'readbtn icon-only ' + (vote === 'up' ? 'likebtn' : 'dismissbtn'), 'type': 'button', 'aria-pressed': 'false', 'hidden': ''});
+    b.addEventListener('click', function(){
+      var on = feedback[p.id] !== vote;
+      setFeedback(p, on ? vote : null);
+      // 興味なしは既読にもする（X で「興味がない」を選ぶと流れから消えるのと同じ）
+      if (on && vote === 'down' && !read[p.id]) { read[p.id] = 1; saveRead(); syncRead(p.id, true, itemDate(p)); }
+      apply(); renderMap();
+    });
+    return b;
+  }
   function register(p, node, rb){
-    node._rb = rb; node._sb = saveButton(p);
-    var actions = el('span', {'class': 'item-actions'}); rb.parentNode.insertBefore(actions, rb); actions.appendChild(node._sb); actions.appendChild(rb);
+    node._rb = rb; node._sb = saveButton(p); node._lb = feedbackButton(p, 'up'); node._db = feedbackButton(p, 'down');
+    var actions = el('span', {'class': 'item-actions'}); rb.parentNode.insertBefore(actions, rb);
+    actions.appendChild(node._lb); actions.appendChild(node._db); actions.appendChild(node._sb); actions.appendChild(rb);
     node.setAttribute('tabindex', '-1'); itemEls[p.id] = node; node.style.setProperty('--c', cvar(p.theme));
   }
   function points(p){
@@ -1724,6 +1749,12 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
         pe._sb.setAttribute('aria-pressed', String(!!later[p.id]));
         pe._sb.textContent = later[p.id] ? '保存済み' : 'あとで読む';
         pe._sb.setAttribute('aria-label', (later[p.id] ? 'あとで読むから外す：' : 'あとで読むに保存：') + p.title);
+        [[pe._lb, 'up', 'いいね'], [pe._db, 'down', '興味なし']].forEach(function(f){
+          var on = feedback[p.id] === f[1];
+          f[0].hidden = !feedbackOn; f[0].setAttribute('aria-pressed', String(on));
+          f[0].setAttribute('aria-label', (on ? f[2] + 'を取り消す：' : f[2] + '：') + p.title); f[0].title = f[2];
+        });
+        pe.classList.toggle('is-dismissed', feedback[p.id] === 'down');
         var vis = !ov && inView(p, v) && !(state.unread && isRead) && !(state.fresh && !isFresh(p)) && !(p._carried && isRead && v === 'co');
         pe.hidden = !vis; if (vis) shown++;
       }
@@ -1849,10 +1880,11 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   // read/<掲載日> = {ids: {項目ID: 1}}（掲載日ごとにまとめて文書の数を抑える）、later/<項目ID> = {source, date, item}。
   // 読み書きは所有者だけ（ルーチンが公開するときの db の rules）。db がない場面（手元のファイル、Codex）と
   // 所有者以外が開いた場面は、このブラウザーにだけ保存する
-  var remoteDb = null, remoteRead = null, remoteLater = null, writeQueues = {};
+  // feedback/<掲載日> = {votes: {項目ID: {vote: "up"/"down", source, theme, title, keywords}}}。翌朝のルーチンが読む
+  var remoteDb = null, remoteRead = null, remoteLater = null, remoteFeedback = null, writeQueues = {};
   function itemDate(p){ return p._carried || p._savedDate || D.date; }
   function showSyncState(on){
-    var text = on ? '既読・あとで読むは、アカウントに保存してほかの端末と同期します。' : '既読・あとで読むは、このブラウザーに保存されます。';
+    var text = on ? '既読・あとで読む・いいねは、アカウントに保存してほかの端末と同期します。いいねと興味なしは、翌朝の「まず読む3件」の選び方に使います。' : '既読・あとで読むは、このブラウザーに保存されます。';
     document.querySelector('.storage-note').textContent = text;
     document.getElementById('footer').textContent = genText + text;
   }
@@ -1860,7 +1892,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     // 一時的な失敗は次の操作で書き直される（文書ごとに今の状態を丸ごと書くため）。それ以外は同期をやめる
     var code = e && e.code;
     if (code === 'unavailable' || code === 'resource_exhausted') return;
-    remoteDb = null; showSyncState(false);
+    remoteDb = null; feedbackOn = false; showSyncState(false); apply();
   }
   // 同じ文書への書き込みは1つずつ順に行う。書く内容は実行するときの状態から作る（null なら消す）
   function writeDoc(path, makeBody){
@@ -1879,6 +1911,19 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
       if (on) ids[id] = 1; else delete ids[id];
       remoteRead[d] = ids;
       writeDoc('read/' + d, function(){ var cur = remoteRead[d] || {}; return Object.keys(cur).length ? {ids: cur} : null; });
+    });
+  }
+  function setFeedback(p, vote){
+    if (!remoteDb || !remoteFeedback) return;
+    if (vote) feedback[p.id] = vote; else delete feedback[p.id];
+    var d = itemDate(p), dates = Object.keys(remoteFeedback).filter(function(x){ return remoteFeedback[x][p.id]; });
+    if (vote && dates.indexOf(d) < 0) dates.push(d);
+    dates.forEach(function(x){
+      var votes = Object.assign({}, remoteFeedback[x] || {});
+      if (vote && x === d) votes[p.id] = {vote: vote, source: p._src, theme: p.theme, title: String(p.title || '').slice(0, 120), keywords: (p.keywords || []).slice(0, 5)};
+      else delete votes[p.id];
+      remoteFeedback[x] = votes;
+      writeDoc('feedback/' + x, function(){ var cur = remoteFeedback[x] || {}; return Object.keys(cur).length ? {votes: cur} : null; });
     });
   }
   function syncLater(id){
@@ -1915,6 +1960,13 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
       later = next;
       Object.keys(later).forEach(function(id){ addRetained(id, later[id]); });
       saveStore(LATER_KEY, later); apply();
+    }, syncFailed);
+    db.collection('feedback').onSnapshot(function(snap){
+      var next = {}, flat = {};
+      snap.docs.forEach(function(doc){ var b = doc.data(); if (b && b.votes && typeof b.votes === 'object') next[doc.id] = JSON.parse(JSON.stringify(b.votes)); });
+      remoteFeedback = next;
+      Object.keys(next).forEach(function(d){ Object.keys(next[d]).forEach(function(id){ var v = next[d][id] && next[d][id].vote; if (v === 'up' || v === 'down') flat[id] = v; }); });
+      feedback = flat; feedbackOn = !!remoteDb; apply();
     }, syncFailed);
   }
   showSyncState(false);

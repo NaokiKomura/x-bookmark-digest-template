@@ -60,6 +60,7 @@ Claude の `artifact_url` は使わない。Codex の履歴は別の担当者が
 `<script type="application/json" id="report-data">` の中身だけが日々変わり、ほかの部分は変えない。
 話題マップ（d3 の treemap）、絞り込み、既読・あとで読む、図解はすべてこの JSON から描く。
 既読・あとで読むは、claude.ai のアーティファクトを所有者が開いたときだけ、アーティファクトの db（`read/<掲載日>`、`later/<項目ID>`）に保存して端末間で同期する。
+同じとき、各項目の「いいね」「興味なし」を `feedback/<掲載日>` に保存し、翌朝の Claude のルーチンが ArtifactData で読んで「まず読む3件」の選び方に使う（ルーチンは読むだけで書かない）。
 db は claude.ai が提供する保存先で、外部への接続ではない。ルーチンが公開するときに、読み書きを所有者だけに絞る rules を宣言する。
 db が使えない場面（手元のファイル、Codex の HTML、所有者以外の閲覧）は localStorage にだけ保存する。
 
