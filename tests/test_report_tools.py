@@ -49,7 +49,7 @@ def test_build_and_validate_roundtrip(tmp_path):
 
 def test_validate_rejects_changes_outside_block(tmp_path):
     out = tmp_path / "r.html"
-    out.write_text(rt.TEMPLATE.read_text(encoding="utf-8").replace("<h1>", "<h1 class=x>"))
+    out.write_text(rt.TEMPLATE.read_text(encoding="utf-8").replace("<main>", "<main class=x>"))
     assert "report-data 以外の部分がテンプレートと違う" in rt.cmd_validate(out)
 
 
