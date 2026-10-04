@@ -65,6 +65,7 @@ Codex で、準備担当が履歴ブランチを取得済みの場合（CODEX.md
 
 - `data/$DAY.json` の `posts`。`jev.tech_label` が `excluded` の投稿はレポートの `excluded` に回し、要約しない。
   `error` があればブックマークの取得に失敗している（`source_status` を `error` にする）。
+  `incomplete` が true なら取得済みの投稿で作り、`source_status` の `note` に「ページ上限に達したため残りは次回に取得」と書く。
 - `data/sources/$DAY.json` の `github`、`qiita`、`zenn`、`devio`、`blogs`、`status`、`blog_status`、`notes`、`errors`。
 - 本文は `data/articles/<article_key>.json`（`text`、`title`、`fetch_status`、`chars`）。
   公式ブログで `fetch_status` が `blocked` か `error`（サイトが取得を拒否した記事など）は、見出しだけを載せる（`points` と `keywords` は空の配列、`visual` なし、`read_min` は1）。見出しはタイトルと `summary`（フィードの概要）から日本語で1文にし、概要に書かれていないことを補わない。
@@ -77,7 +78,9 @@ Codex で、準備担当が履歴ブランチを取得済みの場合（CODEX.md
 git show "origin/$REPORT_BRANCH:summaries/<article_key>.json" 2>/dev/null
 ```
 
-あれば、その `summary`、`theme`、`keywords`、`visual` をそのまま使う。履歴ブランチやキャッシュがなければ新しく要約し、手順8で保存する。
+キャッシュの `key`、`url`、`source` が当日の項目と一致し、JSONとして正しい場合だけ `summary` と `keywords` を再利用する。`theme` は当日のJev判定（判定不能なら当日の分類）を優先する。
+`visual` は資料の内容を説明するものだけ再利用できる。当日のスター増加・順位など日々変わる数値の図は当日の入力で作り直し、材料がなければ省く。キャッシュの日付を確認し、その日付を今日の出来事として扱わない。
+履歴ブランチや有効なキャッシュがなければ新しく要約し、手順8で保存する。
 
 ### 4. キーワードの表記をそろえる
 
@@ -195,20 +198,14 @@ python3 scripts/report_tools.py validate /tmp/report.html
       `{"db": {"rules": [{"path": "", "read": "owner", "write": "owner"}]}}`（既読・あとで読むを所有者のアカウントに保存して端末間で同期するため。毎回同じ値を渡す）。「新しい版がある」と断られたら、その版を読んだうえで `/tmp/report.html` をそのまま公開し直してよい（日報は毎日まるごと差し替えるもので、閲覧者がページに保存する内容はない）。
 
    空なら `url` を渡さずに、上と同じ `capabilities` を付けて publish して新しく作り、最後の報告に「`config/report.json` の `artifact_url` に次の URL を書いて main にコミットしてください: <URL>」と書く（このルーチンは main に push しない）。
-2. 履歴ブランチに保存して push する。
+2. 履歴ブランチに保存して push する。既存の `/tmp/reports-branch` があれば削除せず、別の空のパスを使う。キャッシュは信頼したmainの補助コマンドで検証し、HTMLと同じコミットに含める。
 
 ```bash
 REPORT_BRANCH=claude/reports
-rm -rf /tmp/reports-branch
 git worktree add --detach /tmp/reports-branch "origin/$REPORT_BRANCH"
 mkdir -p /tmp/reports-branch/reports /tmp/reports-branch/summaries
 cp /tmp/report.html "/tmp/reports-branch/reports/$DAY.html"
-for f in /tmp/report-summaries/*.json; do
-  [ -e "$f" ] || continue
-  key=$(basename "$f" .json)
-  case "$key" in *[!0-9a-f]*|"") continue ;; esac
-  [ ${#key} -eq 12 ] && cp "$f" "/tmp/reports-branch/summaries/$key.json"
-done
+python3 scripts/report_tools.py save-summaries "$DAY" /tmp/report-summaries /tmp/reports-branch
 git -C /tmp/reports-branch add reports summaries
 git -C /tmp/reports-branch commit -m "report: $DAY"
 git -C /tmp/reports-branch push origin HEAD:refs/heads/claude/reports

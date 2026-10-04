@@ -9,15 +9,17 @@ python3 scripts/report_tools.py build   DATA.json OUT.html    テンプレート
 python3 scripts/report_tools.py validate OUT.html             差し替えたHTMLを検証する（公開の前に必ず通す）
 python3 scripts/report_tools.py carryover YYYY-MM-DD [--reports DIR]  前日から3日前までのレポートの項目（report-data の carryover）
 python3 scripts/report_tools.py archive YYYY-MM-DD [--reports DIR]    前日から14日前までのレポートの索引（report-data の archive）
+python3 scripts/report_tools.py save-summaries YYYY-MM-DD IN_DIR CHECKOUT  検証したキャッシュを履歴に保存
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +44,7 @@ DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def is_number(x: Any) -> bool:
-    return isinstance(x, int | float) and not isinstance(x, bool)
+    return isinstance(x, int | float) and not isinstance(x, bool) and math.isfinite(x)
 
 
 def load_topics() -> list[dict[str, str]]:
@@ -273,7 +275,7 @@ def validate_archive(archive: Any, day: str) -> list[str]:
             errors.append("archive の要素は date と items を持つオブジェクト")
             continue
         d = str(entry.get("date", ""))
-        if not DATE_RE.fullmatch(d) or d >= day:
+        if not is_date(d) or d >= day:
             errors.append(f"archive.date は当日より前の YYYY-MM-DD: {d}")
         for row in entry["items"]:
             errors += [f"archive {d}: {e}" for e in archive_item_errors(row, topic_ids)]
@@ -319,7 +321,79 @@ def outside_block(html: str) -> str:
     return BLOCK.sub(lambda m: m.group(1) + m.group(3), html, count=1)
 
 
+def cmd_save_summaries(day: str, incoming: Path, reports: Path) -> dict[str, int]:
+    """当日の入力と照合し、検証したJSONだけを履歴checkoutへ保存する。"""
+    if not is_date(day) or incoming.is_symlink():
+        raise SystemExit("日付か要約ディレクトリが不正")
+    sources = read(ROOT / "data" / "sources" / f"{day}.json") or {}
+    if sources and sources.get("date") != day:
+        raise SystemExit("当日の入力の日付が一致しない")
+    known = {
+        (source, item["article_key"]): item["url"]
+        for source in ("github", "qiita", "zenn", "devio")
+        for item in sources.get(source, [])
+    }
+    dest = reports / "summaries"
+    if dest.is_symlink():
+        raise SystemExit("保存先にシンボリックリンクは使えない")
+    counts = {"saved": 0, "skipped": 0}
+    for path in sorted(incoming.glob("*.json")):
+        counts["skipped"] += 1
+        if path.is_symlink() or not path.is_file():
+            continue
+        try:
+            data = read(path)
+        except (ValueError, OSError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        key, source = data.get("key"), data.get("source")
+        if not isinstance(key, str) or not re.fullmatch(r"[0-9a-f]{12}", key):
+            continue
+        if source not in ("github", "qiita", "zenn", "devio") or data.get("date") != day:
+            continue
+        if data.get("url") != known.get((source, key)) or (source, key) not in known:
+            continue
+        item = {**data, "id": key, "site": source}
+        if item_errors("github" if source == "github" else "articles", item):
+            continue
+        clean = {k: data[k] for k in ("key", "source", "url", "date", "title", "summary", "theme")}
+        clean["keywords"] = data.get("keywords", [])
+        clean["visual"] = data.get("visual")
+        dest.mkdir(parents=True, exist_ok=True)
+        # ファイル名は受け取らず、検証したkeyから組み立てる。既存リンクも辿らない。
+        out = dest / f"{key}.json"
+        if out.is_symlink():
+            continue
+        out.write_text(json.dumps(clean, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        counts["saved"] += 1
+        counts["skipped"] -= 1
+    return counts
+
+
+def is_date(value: Any) -> bool:
+    if not isinstance(value, str) or not DATE_RE.fullmatch(value):
+        return False
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def is_text(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
 def validate_data(data: Any) -> list[str]:
+    """不正なJSONも例外にせず、問題の一覧を返す。"""
+    try:
+        return validate_report(data)
+    except (TypeError, ValueError, AttributeError, OverflowError):
+        return ["report-data の項目の型が不正"]
+
+
+def validate_report(data: Any) -> list[str]:
     """report-data の形を確かめる。問題の一覧を返す（空なら合格）。"""
     errors: list[str] = []
     if not isinstance(data, dict):
@@ -331,7 +405,7 @@ def validate_data(data: Any) -> list[str]:
             errors.append(message)
 
     need(
-        bool(re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(data.get("date", "")))),
+        is_date(data.get("date")),
         "date が YYYY-MM-DD でない",
     )
     need(isinstance(data.get("lede"), str), "lede がない")
@@ -356,7 +430,47 @@ def validate_data(data: Any) -> list[str]:
         need(isinstance(data.get(key), list), f"{key} が配列でない")
     if errors:
         return errors
+    companies = data.get("blog_companies", [])
+    need(
+        isinstance(companies, list)
+        and all(
+            isinstance(company, dict)
+            and is_text(company.get("company"))
+            and is_text(company.get("label"))
+            and company.get("status") in SOURCE_STATES
+            for company in companies
+        ),
+        "blog_companies は company・label・status を持つオブジェクトの配列",
+    )
 
+    for key in (
+        "themes",
+        "trend",
+        "posts",
+        "github",
+        "articles",
+        "blogs",
+        "source_status",
+        "excluded",
+    ):
+        need(all(isinstance(item, dict) for item in data[key]), f"{key} の要素がオブジェクトでない")
+    need(all(is_text(pid) for pid in data["picks"]), "picks のIDが文字列でない")
+    if errors:
+        return errors
+    if "generated_at" in data:
+        try:
+            generated = datetime.fromisoformat(data["generated_at"])
+            need(generated.utcoffset() == timedelta(hours=9), "generated_at は +09:00 の日時")
+        except (TypeError, ValueError):
+            need(False, "generated_at が日時でない")
+    for row in data["trend"]:
+        need(is_date(row.get("date")), "trend.date が日付でない")
+        need(
+            isinstance(row.get("count"), int)
+            and not isinstance(row.get("count"), bool)
+            and row["count"] >= 0,
+            "trend.count は0以上の整数",
+        )
     for t in data["themes"]:
         need(t.get("id") in topic_ids, f"themes に一覧にないトピック: {t.get('id')}")
 
@@ -367,13 +481,27 @@ def validate_data(data: Any) -> list[str]:
             need(False, f"{where}: visual.type が不明")
             return
         kind = v["type"]
-        if kind == "flow":
+        if kind == "before_after":
+            sides = [v.get("before"), v.get("after")]
+            numeric = all(isinstance(side, dict) and is_number(side.get("value")) for side in sides)
+            textual = all(isinstance(side, dict) and is_text(side.get("text")) for side in sides)
+            need(numeric or textual, f"{where}: before_after は前後の数値か文字列が必要")
+            need(
+                all(isinstance(side, dict) and is_text(side.get("label")) for side in sides),
+                f"{where}: before_after.label がない",
+            )
+        elif kind == "flow":
             steps = v.get("steps")
             need(
                 isinstance(steps, list)
-                and bool(steps)
+                and 3 <= len(steps) <= 5
                 and all(
-                    isinstance(s, str) or (isinstance(s, dict) and isinstance(s.get("label"), str))
+                    is_text(s)
+                    or (
+                        isinstance(s, dict)
+                        and is_text(s.get("label"))
+                        and isinstance(s.get("detail", ""), str)
+                    )
                     for s in steps
                 ),
                 f"{where}: flow.steps は文字列か {{label, detail?}} の配列",
@@ -382,13 +510,23 @@ def validate_data(data: Any) -> list[str]:
             items = v.get("items")
             need(
                 isinstance(items, list)
-                and all(isinstance(i, dict) and i.get("name") for i in items),
+                and 2 <= len(items) <= 4
+                and all(isinstance(i, dict) and is_text(i.get("name")) for i in items),
                 f"{where}: options.items に name がない",
             )
             for i in items if isinstance(items, list) else []:
                 if isinstance(i, dict) and "value" in i:
                     need(is_number(i["value"]), f"{where}: options.items.value が数値でない")
         elif kind == "versus":
+            need(
+                all(
+                    isinstance(v.get(side), dict) and is_text(v[side].get("label"))
+                    for side in ("a", "b")
+                ),
+                f"{where}: versus に a と b の label がない",
+            )
+            need(v.get("winner") in (None, "a", "b"), f"{where}: versus.winner が不明")
+            need(isinstance(v.get("criteria", []), list), f"{where}: versus.criteria が配列でない")
             for c in v.get("criteria") or []:
                 need(
                     isinstance(c, dict)
@@ -409,12 +547,16 @@ def validate_data(data: Any) -> list[str]:
         elif kind == "matrix":
             items = v.get("items")
             need(
-                isinstance(v.get("x"), dict) and isinstance(v.get("y"), dict),
+                all(
+                    isinstance(v.get(axis), dict)
+                    and all(is_text(v[axis].get(k)) for k in ("label", "low", "high"))
+                    for axis in ("x", "y")
+                ),
                 f"{where}: matrix に x と y の軸がない",
             )
             need(
                 isinstance(items, list)
-                and 1 <= len(items) <= 8
+                and 2 <= len(items) <= 6
                 and all(
                     isinstance(i, dict)
                     and i.get("name")
@@ -422,12 +564,12 @@ def validate_data(data: Any) -> list[str]:
                     and i.get("y") in MATRIX_LEVELS
                     for i in items
                 ),
-                f"{where}: matrix.items は1〜8個で、x と y は 1〜3",
+                f"{where}: matrix.items は2〜6個で、x と y は 1〜3",
             )
 
     def check_item(section: str, item: dict[str, Any]) -> None:
-        iid = str(item.get("id", ""))
-        need(bool(iid), f"{section}: id がない")
+        iid = item.get("id", "")
+        need(is_text(iid), f"{section}: id がない")
         need(iid not in ids, f"{section}: id が重複: {iid}")
         ids.add(iid)
         need(
@@ -447,7 +589,10 @@ def validate_data(data: Any) -> list[str]:
             check_visual(f"{section} {iid}", item["visual"])
         for k in ("keywords", "points"):
             if k in item:
-                need(isinstance(item[k], list), f"{section} {iid}: {k} が配列でない")
+                need(
+                    isinstance(item[k], list) and all(is_text(text) for text in item[k]),
+                    f"{section} {iid}: {k} は文字列の配列",
+                )
 
     for p in data["posts"]:
         check_item("posts", p)
@@ -474,9 +619,12 @@ def validate_data(data: Any) -> list[str]:
         for item in data[section]:
             rm = item.get("read_min")
             need(
-                isinstance(rm, int | float) and 1 <= rm <= MAX_READ_MIN,
+                is_number(rm) and 1 <= rm <= MAX_READ_MIN,
                 f"{section} {item.get('id')}: read_min は1〜{MAX_READ_MIN}",
             )
+    for section in ("github", "articles"):
+        for item in data[section]:
+            need(is_text(item.get("summary")), f"{section} {item.get('id')}: summary がない")
     for b in data["blogs"]:
         need(
             b.get("fetch_status") in FETCH_STATUSES,
@@ -485,12 +633,19 @@ def validate_data(data: Any) -> list[str]:
     for a in data["articles"]:
         need(a.get("site") in ("qiita", "zenn", "devio"), f"articles {a.get('id')}: site が不明")
     for s in data["source_status"]:
+        need(
+            isinstance(s.get("count"), int)
+            and not isinstance(s.get("count"), bool)
+            and s["count"] >= 0,
+            "source_status.count は0以上の整数",
+        )
         need(s.get("status") in SOURCE_STATES, f"source_status {s.get('source')}: status が不明")
         need(s.get("source") in SOURCE_NAMES, f"source_status: source が不明: {s.get('source')}")
     for x in data["excluded"]:
         need(x.get("source") in EXCLUDED_SOURCES, f"excluded: source が不明: {x.get('source')}")
     for pid in data["picks"]:
         need(pid in ids, f"picks に存在しない項目: {pid}")
+    need(len(set(data["picks"])) == len(data["picks"]), "picks のIDが重複")
     need(len(data["picks"]) <= 3, "picks は3件まで")
     reasons = data.get("pick_reasons", {})
     need(
@@ -516,7 +671,7 @@ def validate_carryover(carry: Any, day: str) -> list[str]:
             errors.append("carryover の要素がオブジェクトでない")
             continue
         d = str(entry.get("date", ""))
-        if not DATE_RE.fullmatch(d) or d >= day:
+        if not is_date(d) or d >= day:
             errors.append(f"carryover.date は当日より前の YYYY-MM-DD: {d}")
         for section in CARRY_SECTIONS:
             items = entry.get(section, [])
@@ -561,6 +716,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("archive")
     p.add_argument("date")
     p.add_argument("--reports", default="reports")
+    p = sub.add_parser("save-summaries")
+    p.add_argument("date")
+    p.add_argument("incoming")
+    p.add_argument("reports")
     args = parser.parse_args(argv)
 
     if args.cmd == "inputs":
@@ -576,6 +735,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(cmd_carryover(args.date, Path(args.reports)), ensure_ascii=False))
     elif args.cmd == "archive":
         print(json.dumps(cmd_archive(args.date, Path(args.reports)), ensure_ascii=False))
+    elif args.cmd == "save-summaries":
+        print(json.dumps(cmd_save_summaries(args.date, Path(args.incoming), Path(args.reports))))
     elif args.cmd == "validate":
         errors = cmd_validate(Path(args.html))
         if errors:

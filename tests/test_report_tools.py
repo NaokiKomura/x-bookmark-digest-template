@@ -273,3 +273,79 @@ def test_validate_checks_archive():
     errors = rt.validate_data(data)
     assert any("archive.date" in e for e in errors)
     assert any("https://" in e for e in errors)
+
+
+def test_validate_rejects_malformed_nested_data_without_raising():
+    import copy
+
+    mutations = [
+        lambda d: d.update(date="2026-99-99"),
+        lambda d: d.update(themes=[None]),
+        lambda d: d.update(trend=[None]),
+        lambda d: d.update(picks=[{}]),
+        lambda d: d["posts"][0].update(points=None),
+        lambda d: d["posts"][0].update(theme=[]),
+        lambda d: d["posts"][0].update(id=1),
+        lambda d: d["posts"][0].update(read_min=True),
+        lambda d: d["posts"][0].update(visual={"type": "before_after"}),
+        lambda d: d["posts"][0].update(visual={"type": "versus", "criteria": 1}),
+        lambda d: d["posts"][0].update(visual={"type": "stat", "value": float("nan")}),
+        lambda d: d["posts"][0].update(visual={"type": "flow", "steps": ["one"]}),
+        lambda d: d["posts"][0].update(visual={"type": "options", "items": []}),
+        lambda d: d.update(generated_at="invalid"),
+        lambda d: d["source_status"][0].update(count=-1),
+        lambda d: d["trend"][0].update(count=-1),
+    ]
+    for mutate in mutations:
+        data = copy.deepcopy(sample())
+        mutate(data)
+        assert rt.validate_data(data), mutate
+
+
+def test_template_topics_match_config():
+    import re
+
+    html = rt.TEMPLATE.read_text()
+    block = re.search(r"var TOPICS = \[(.*?)\];", html, re.S).group(1)
+    pairs = re.findall(r"\['([^']+)','([^']+)'\]", block)
+    assert pairs == [(t["id"], t["name"]) for t in rt.load_topics()]
+
+
+def test_saves_only_verified_summary_json(monkeypatch, tmp_path):
+    monkeypatch.setattr(rt, "ROOT", tmp_path)
+    inputs = tmp_path / "data" / "sources"
+    inputs.mkdir(parents=True)
+    incoming, reports = tmp_path / "incoming", tmp_path / "history"
+    incoming.mkdir()
+    key = "0123456789ab"
+    (inputs / "2026-10-04.json").write_text(
+        json.dumps(
+            {
+                "date": "2026-10-04",
+                "github": [{"article_key": key, "url": "https://github.com/a/b"}],
+            }
+        )
+    )
+    valid = {
+        "key": key,
+        "source": "github",
+        "url": "https://github.com/a/b",
+        "date": "2026-10-04",
+        "title": "a/b",
+        "summary": "説明",
+        "theme": "devtools",
+        "keywords": ["Git"],
+        "extra": "捨てる",
+    }
+    # 設定は信頼したリポジトリのものを使う。
+    monkeypatch.setattr(rt, "load_topics", lambda: [{"id": "devtools", "name": "開発ツール"}])
+    (incoming / "arbitrary-name.json").write_text(json.dumps(valid))
+    (incoming / "wrong-source.json").write_text(json.dumps({**valid, "source": "zenn"}))
+    (incoming / "wrong-url.json").write_text(json.dumps({**valid, "url": "https://other.test"}))
+    (incoming / "wrong-day.json").write_text(json.dumps({**valid, "date": "2026-10-03"}))
+    (incoming / "invalid-key.json").write_text(json.dumps({**valid, "key": "../bad"}))
+    (incoming / "link.json").symlink_to(incoming / "arbitrary-name.json")
+    assert rt.cmd_save_summaries("2026-10-04", incoming, reports) == {"saved": 1, "skipped": 5}
+    saved = json.loads((reports / "summaries" / f"{key}.json").read_text())
+    assert saved["summary"] == "説明" and "extra" not in saved
+    assert len(list((reports / "summaries").iterdir())) == 1
