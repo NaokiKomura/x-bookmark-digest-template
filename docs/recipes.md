@@ -52,7 +52,7 @@ make check
 ## レポートの表示を変える
 
 1. `template/report.html` を直す。データ中の文字列は `el(tag, attrs, text)`（textContent）で入れ、innerHTML を使わない。リンクは `safeUrl` / `link` を通す
-2. 色はトークン（`--ink`、`--blue` など）だけを使い、強調色は `--blue` にそろえる。企業のロゴ（`.av.org[data-co]`）だけは例外。ライトとダークの両方の値を `:root` と2つのダークのブロックに書く
+2. 色はトークン（`--ink`、`--blue` など）だけを使い、強調色は `--blue` にそろえる。企業と情報源のロゴ（`.av.org[data-co]`、元画像は `template/icons/`）だけは例外。ライトとダークの両方の値を `:root` と2つのダークのブロックに書く
 3. `make preview` で見た目を確かめる（サンプルデータで、スマホ幅とダークモードも）
 4. `make check`（テンプレートのサンプルデータの検証を含む）
 
