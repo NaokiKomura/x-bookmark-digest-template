@@ -1,3 +1,4 @@
+import base64
 import json
 
 from scripts import report_tools as rt
@@ -9,6 +10,16 @@ def sample():
 
 def test_template_sample_is_valid():
     assert rt.validate_data(sample()) == []
+
+
+def test_company_icons_are_embedded_in_template():
+    # レポートは1ファイルで公開するので、template/icons/ の画像はテンプレートに data URI で入れておく
+    template = rt.TEMPLATE.read_text(encoding="utf-8")
+    icons = sorted((rt.TEMPLATE.parent / "icons").iterdir())
+    assert icons
+    for icon in icons:
+        embedded = base64.b64encode(icon.read_bytes()).decode()
+        assert f'[data-co="{icon.stem}"]' in template and embedded in template, icon.name
 
 
 def test_pick_reasons_are_optional_for_existing_reports():

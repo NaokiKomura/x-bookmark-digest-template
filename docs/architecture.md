@@ -54,7 +54,7 @@ Claude の `artifact_url` は使わない。Codex の履歴は別の担当者が
 
 ## 表示層
 
-`template/report.html` は1ファイルで完結し、画像を必要としない。話題マップには cdnjs の d3 を使い、取得できない場合は話題名と件数のボタンを表示する。フォントは外部から読み込まず、システムフォントを使う。
+`template/report.html` は1ファイルで完結する。画像は企業のロゴだけで、元画像を `template/icons/` に置き、テンプレートには data URI で埋め込んでいる（外部から読み込まない）。話題マップには cdnjs の d3 を使い、取得できない場合は話題名と件数のボタンを表示する。フォントは外部から読み込まず、システムフォントを使う。
 `<script type="application/json" id="report-data">` の中身だけが日々変わり、ほかの部分は変えない。
 話題マップ（d3 の treemap）、絞り込み、既読・あとで読む（localStorage）、図解はすべてこの JSON から描く。
 
