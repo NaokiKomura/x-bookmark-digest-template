@@ -11,6 +11,30 @@ def test_template_sample_is_valid():
     assert rt.validate_data(sample()) == []
 
 
+def test_pick_reasons_are_optional_for_existing_reports():
+    data = sample()
+    del data["pick_reasons"]
+    assert rt.validate_data(data) == []
+
+
+def test_pick_reasons_reject_unknown_ids_empty_text_and_wrong_types():
+    data = sample()
+    for reasons in ({"nope": "理由"}, {"s1": " "}, {"s1": 7}, ["理由"], None):
+        data["pick_reasons"] = reasons
+        assert any("pick_reasons" in error for error in rt.validate_data(data))
+
+
+def test_pick_reasons_build_roundtrip_escapes_article_text(tmp_path):
+    data = sample()
+    data["pick_reasons"] = {"s1": "</script><script>alert(1)</script>"}
+    src, out = tmp_path / "d.json", tmp_path / "r.html"
+    src.write_text(json.dumps(data, ensure_ascii=False))
+    rt.cmd_build(src, out)
+    assert rt.cmd_validate(out) == []
+    assert "</script><script>alert" not in out.read_text()
+    assert rt.extract_data(out.read_text())["pick_reasons"] == data["pick_reasons"]
+
+
 def test_build_and_validate_roundtrip(tmp_path):
     data = sample()
     data["lede"] = "</script><script>alert(1)</script>"

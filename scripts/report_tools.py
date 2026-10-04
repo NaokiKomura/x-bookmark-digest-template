@@ -387,6 +387,15 @@ def validate_data(data: Any) -> list[str]:
     for pid in data["picks"]:
         need(pid in ids, f"picks に存在しない項目: {pid}")
     need(len(data["picks"]) <= 3, "picks は3件まで")
+    reasons = data.get("pick_reasons", {})
+    need(
+        isinstance(reasons, dict)
+        and all(
+            key in data["picks"] and isinstance(value, str) and bool(value.strip())
+            for key, value in reasons.items()
+        ),
+        "pick_reasons は picks のIDをキーとする空でない文字列のオブジェクト",
+    )
     errors += validate_carryover(data.get("carryover", []), str(data["date"]))
     return errors
 

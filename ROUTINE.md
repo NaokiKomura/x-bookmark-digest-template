@@ -30,7 +30,7 @@ Codex は Claude のアーティファクト設定を参照せず、相手側の
 4. テック判定が保留（`jev.tech_label` が `hold`）の項目は、内容を読んでテック系かどうかを決める。テック系でなければ除外リストに移す。`jev.status` が `unavailable` のブックマークと Qiita・Zenn の記事も、同じようにテック判定を自分で行う。
 5. 記事に書かれていることと、引用元の投稿の主張を混ぜずに書き分ける。ブックマークした投稿者の意見や感想は載せない（記事も引用もない投稿だけの項目は、投稿の内容を要点にする）。
 6. 情報源ごとに決めた要約の深さを守る（下の表）。前日にも載っていたランキング項目（`streak_days` が2以上）は、選んだ履歴ブランチの `summaries/<article_key>.json` の要約を再利用する。
-7. 図解の数値は資料に書かれているものだけを使う（`options` の `value`、`stat` の `compare` も同じ）。なければ数値を使わない種類の図（`flow`、`versus`、`options`、`matrix`、文字の `before_after`）にするか、図を省く。`matrix` の位置は資料の記述から判断できるときだけ使う。
+7. 図解は処理の順序・比較・関係を文章より分かりやすくする場合に使い、要約の繰り返しになる図は省く。数値は資料に書かれているものだけを使う（`options` の `value`、`stat` の `compare` も同じ）。なければ数値を使わない種類の図（`flow`、`versus`、`options`、`matrix`、文字の `before_after`）にするか、図を省く。`matrix` の位置は資料の記述から判断できるときだけ使う。
 8. キーワードは既存レポートの表記に合わせる（手順4で一覧を出して参照する）。
 9. `template/report.html` の `report-data` ブロックだけを書き換え、ほかの部分は変更しない（`report_tools.py build` を使えばそうなる）。
 10. 書き換えたHTMLは `report_tools.py validate` が `OK` を返すまで直してから公開する。`NG` のまま公開しない。
@@ -101,9 +101,10 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | section_summaries | `{"blogs", "trends"}`。公式ブログ全体、トレンド（GitHub・Qiita・Zenn・DevelopersIO）全体で、どんな話題が多かったかを1〜2文で。新着がない情報源は省いてよい |
 | themes | その日に登場したトピック。`{"id", "name", "summary"}`。id と name は `config/topics.json` のもの。summary は1文 |
 | picks | 「まず読む3件」の項目ID。全情報源から、重要度とほかの項目とのつながりで選ぶ |
+| pick_reasons | 任意のオブジェクト。`picks` のIDをキーに、今日その記事を読む理由を短い1文で書く。要約の繰り返しや根拠のない評価にしない。旧レポートでは省略できる |
 | trend | `python3 scripts/report_tools.py trend "$DAY"` の出力をそのまま使う |
 | posts | ブックマークの要約（下の表） |
-| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（`blocked`・`error` なら画面には見出しだけが出る）。`read_min` は記事の `chars`（取れなければ `summary` の文字数）÷ 500 を切り上げ、最低1・最大15 |
+| blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（`blocked`・`error` なら画面には見出しだけが出る）。`read_min` は原文を読む時間で、記事の `chars`（取れなければ `summary` の文字数）÷ 500 を切り上げ、最低1・最大15 |
 | blog_companies | 企業ごとの状況。`{"company", "label", "status": "ok"/"none"/"error", "count"}`。`blog_status` を企業単位にまとめる（どれか1つでも新着があれば ok、全ブログが error なら error、それ以外は none） |
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
@@ -123,7 +124,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | points | 補足の要点1〜3個 |
 | keywords | 2〜3個 |
 | importance | 1〜3。3は「必読」 |
-| read_min | 記事がある場合は記事の `chars` ÷ 500 を切り上げ。ない場合は投稿と引用元の文字数 ÷ 500 を切り上げ。どちらも最低1、最大15（長い README や記事で合計が膨らまないようにする） |
+| read_min | 原文を読む時間。記事がある場合は記事の `chars` ÷ 500 を切り上げ。ない場合は投稿と引用元の文字数 ÷ 500 を切り上げ。どちらも最低1、最大15。日報の要約を読む時間はテンプレートが別に算出する |
 | kind | `quoted` も `links` もなければ `post`、`quoted` だけなら `quote`、`links` だけなら `article`、両方なら `quote_article` |
 | article | 記事があるとき。`{"title", "domain", "url", "fetch_status"}`。リンクが複数あるときは主な1本 |
 | quoted | 引用のとき。`{"author", "handle", "url", "claim"}`（claim は引用元の主張の1文要約） |
