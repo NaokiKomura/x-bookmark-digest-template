@@ -186,3 +186,40 @@ def test_blog_save_failure_does_not_advance_seen(digest_root, monkeypatch):
     with httpx.Client(transport=httpx.MockTransport(fake_sites)) as http, pytest.raises(OSError):
         fs.collect(http, DAY)
     assert not fs.seen_urls_path().exists()
+
+
+def test_rankings_rerun_preserves_successful_judgments(digest_root):
+    with httpx.Client(transport=httpx.MockTransport(fake_sites)) as http:
+        first = fs.collect(http, DAY)
+        for source in ("github", "qiita", "zenn"):
+            first[source][0]["jev"] = {"status": "ok", "topic": "devtools", "topic_prob": 0.9}
+        fs.write_json(fs.sources_path(DAY), first)
+        again = fs.collect(http, DAY)
+    for source in ("github", "qiita", "zenn"):
+        assert again[source][0]["jev"] == first[source][0]["jev"]
+
+
+def test_rerun_restores_excluded_ranking_judgment(digest_root):
+    with httpx.Client(transport=httpx.MockTransport(fake_sites)) as http:
+        first = fs.collect(http, DAY)
+        item = first["qiita"].pop(0)
+        fs.write_json(fs.sources_path(DAY), first)
+        fs.write_json(
+            fs.excluded_path(DAY),
+            {
+                "date": DAY.isoformat(),
+                "items": [
+                    {
+                        "source": "qiita",
+                        "id": item["article_key"],
+                        "title": item["title"],
+                        "url": item["url"],
+                        "tech_prob": 0.1,
+                    }
+                ],
+            },
+        )
+        again = fs.collect(http, DAY)
+    restored = next(i for i in again["qiita"] if i["article_key"] == item["article_key"])
+    assert restored["jev"]["status"] == "ok"
+    assert restored["jev"]["tech_label"] == "excluded"

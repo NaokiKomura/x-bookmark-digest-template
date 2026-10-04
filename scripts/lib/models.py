@@ -84,6 +84,8 @@ class BookmarksFile(TypedDict):
     posts: list[Post]
     error: NotRequired[str]
     """X API の取得に失敗したときだけ付く。"""
+    incomplete: NotRequired[bool]
+    """ページ上限で中断したとき。次回に続きから取得する。"""
 
 
 # ---------- data/articles/<article_key>.json ----------
@@ -213,6 +215,9 @@ class ExcludedFile(TypedDict):
 class SeenIds(TypedDict):
     ids: list[str]
     """新しい順。上限 20,000 件。"""
+    pagination_token: NotRequired[str]
+    pending_ids: NotRequired[list[str]]
+    """続き取得が完了するまで ids に確定しない取得済みID。"""
 
 
 class SeenUrls(TypedDict):

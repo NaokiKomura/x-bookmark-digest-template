@@ -59,6 +59,16 @@ Runner = Callable[..., Any]
 class BookmarksFetchError(RuntimeError):
     """X API からブックマークを取れなかった（トークンの問題ではない）。"""
 
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+
+
+class BookmarkBatch(list[Post]):
+    """取得した投稿と、ページ上限で中断した場合の続き。"""
+
+    next_token: str | None = None
+
 
 # ---------- リフレッシュトークンの読み書き ----------
 
@@ -112,12 +122,14 @@ def fetch_new_bookmarks(
     seen: set[str],
     page_size: int = PAGE_SIZE,
     max_pages: int = MAX_PAGES,
-) -> list[Post]:
+    *,
+    pagination_token: str | None = None,
+) -> BookmarkBatch:
     """新着のブックマークを新しい順に返す。取得済みの投稿に当たったら、そこで止める。"""
     headers = {"Authorization": f"Bearer {access_token}"}
     url = BOOKMARKS_URL.format(user_id=user_id)
-    posts: list[Post] = []
-    token: str | None = None
+    posts = BookmarkBatch()
+    token = pagination_token
     for _ in range(max_pages):
         params: dict[str, Any] = {**PARAMS, "max_results": page_size}
         if token:
@@ -127,7 +139,7 @@ def fetch_new_bookmarks(
         except httpx.HTTPError as error:
             raise BookmarksFetchError(type(error).__name__) from error
         if response.is_error:
-            raise BookmarksFetchError(f"HTTP {response.status_code}")
+            raise BookmarksFetchError(f"HTTP {response.status_code}", response.status_code)
         body = response.json()
         includes = body.get("includes") or {}
         users = {u["id"]: u for u in includes.get("users", [])}
@@ -139,6 +151,7 @@ def fetch_new_bookmarks(
         token = (body.get("meta") or {}).get("next_token")
         if not token:
             break
+    posts.next_token = token
     return posts
 
 
@@ -236,7 +249,9 @@ def to_post(tweet: dict[str, Any], users: dict[str, Any], tweets: dict[str, Any]
 # ---------- 保存 ----------
 
 
-def merge_day_file(day: date, posts: list[Post], error: str | None) -> int:
+def merge_day_file(
+    day: date, posts: list[Post], error: str | None, *, incomplete: bool = False
+) -> int:
     """同じ日の再実行では既存の投稿に足す（ID で重複を除く）。追加した件数を返す。"""
     path = bookmarks_path(day)
     data: BookmarksFile = read_json(path, {"date": day.isoformat(), "posts": []})
@@ -244,6 +259,7 @@ def merge_day_file(day: date, posts: list[Post], error: str | None) -> int:
     added = [p for p in posts if p["id"] not in known]
     data["posts"].extend(added)
     data["fetched_at"] = now_iso()
+    data["incomplete"] = incomplete
     if error:
         data["error"] = error
     else:
@@ -263,9 +279,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-pages", type=int, default=MAX_PAGES)
     parser.add_argument("--page-size", type=int, default=PAGE_SIZE)
     args = parser.parse_args(argv)
+    if args.max_pages < 1 or not 5 <= args.page_size <= 100:
+        parser.error("max-pages は1以上、page-size は5〜100にしてください")
 
     day = today_jst()
-    seen: list[str] = read_json(seen_ids_path(), {"ids": []})["ids"]
+    state: SeenIds = read_json(seen_ids_path(), {"ids": []})
+    seen = state["ids"]
+    pending = state.get("pending_ids", [])
+    cursor = state.get("pagination_token")
     client_id = os.environ.get("X_CLIENT_ID", "")
     user_id = os.environ.get("X_USER_ID", "")
     if not client_id or not user_id:
@@ -285,18 +306,49 @@ def main(argv: list[str] | None = None) -> int:
         print("refresh token rotated and written back")
 
         error_message = None
+        next_token = None
         try:
-            posts = fetch_new_bookmarks(
-                http, access, user_id, set(seen), args.page_size, args.max_pages
+            batch = fetch_new_bookmarks(
+                http,
+                access,
+                user_id,
+                set(seen),
+                args.page_size,
+                args.max_pages,
+                pagination_token=cursor,
             )
+            next_token = batch.next_token
+            known_pending = set(pending)
+            posts = [p for p in batch if p["id"] not in known_pending]
         except BookmarksFetchError as error:
             posts, error_message = [], f"ブックマークの取得に失敗: {error}"
             actions.warning(error_message)
             actions.set_output("bookmarks_error", "1")
+            if cursor and error.status_code in (400, 404):
+                # 期限切れのカーソルは次回先頭から読み直す。旧境界と取得途中のIDは保つ。
+                state.pop("pagination_token", None)
+                write_json(seen_ids_path(), state)
 
-    added = merge_day_file(day, posts, error_message)
+    added = merge_day_file(
+        day,
+        posts,
+        error_message,
+        incomplete=bool(next_token) if not error_message else bool(pending),
+    )
     if not error_message:
-        update_seen(seen, [p["id"] for p in posts])
+        collected = list(dict.fromkeys([*pending, *(p["id"] for p in posts)]))
+        if next_token:
+            write_json(
+                seen_ids_path(),
+                {
+                    "ids": seen,
+                    "pending_ids": collected,
+                    "pagination_token": next_token,
+                },
+            )
+            actions.warning("ブックマークはページ上限に達しました。次回に続きから取得します")
+        else:
+            update_seen(seen, collected)
     print(f"bookmarks: {added} new")
     return 0
 

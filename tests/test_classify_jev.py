@@ -230,3 +230,19 @@ def test_rerun_preserves_exclusions_and_updates_rejudged_items(digest_root):
     assert [(i["source"], i["id"]) for i in json.loads(xpath.read_text())["items"]] == [
         ("bookmarks", "2")
     ]
+
+
+def test_ranking_uses_configured_top(digest_root, monkeypatch):
+    original = cj.load_config
+    monkeypatch.setattr(
+        cj,
+        "load_config",
+        lambda name: {"qiita": {"top": 2}} if name == "sources.json" else original(name),
+    )
+    sources = {
+        "qiita": [entry("one", 1), entry("two", 2)],
+        "reserve": {"qiita": [entry("three", 3)]},
+    }
+    clf = cj.Classifier(fake_judge({"one": 0.1}), TH)
+    cj.classify_ranking(sources, "qiita", "Qiita", clf, CONF, [], lambda item: None)
+    assert [item["title"] for item in sources["qiita"]] == ["two", "three"]

@@ -28,14 +28,17 @@ from scripts.lib import actions, parsers
 from scripts.lib.models import (
     BlogItem,
     BlogStatus,
+    ExcludedFile,
     RankingItem,
     RankingSite,
     RepoItem,
     SeenUrls,
     SourcesFile,
+    TechJev,
 )
 from scripts.lib.parsers import ParsedEntry, ParsedRepo, ParseError
 from scripts.lib.store import (
+    excluded_path,
     load_config,
     load_enabled,
     previous_day,
@@ -271,6 +274,9 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
     streaks = previous_streaks(day)
     out = empty_sources(day)
     saved: SourcesFile = read_json(sources_path(day), empty_sources(day))
+    saved_excluded: ExcludedFile = read_json(
+        excluded_path(day), {"date": day.isoformat(), "items": []}
+    )
     out["blogs"] = list({clean_url(i["url"]): i for i in saved["blogs"]}.values())
 
     enabled = load_enabled()
@@ -285,6 +291,37 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
         )
         actions.warning(f"{source}: {error}")
 
+    def restore_judgments(name: str, entries: list[RepoItem] | list[RankingItem]) -> None:
+        saved_by_source: dict[str, list[RepoItem] | list[RankingItem]] = {
+            "github": saved["github"],
+            "qiita": saved["qiita"],
+            "zenn": saved["zenn"],
+            "devio": saved["devio"],
+        }
+        saved_items: list[RepoItem | RankingItem] = list(saved_by_source[name])
+        reserve = saved.get("reserve")
+        if reserve and name in ("qiita", "zenn"):
+            saved_items.extend(reserve["qiita"] if name == "qiita" else reserve["zenn"])
+        known = {i["article_key"]: i.get("jev") for i in saved_items}
+        for excluded in saved_excluded["items"]:
+            if excluded["source"] != name or excluded["tech_prob"] is None:
+                continue
+            if known.get(excluded["id"]) is None:
+                # 除外したランキング項目は当日の配列から外れている。履歴から判定を復元する。
+                # 除外項目のトピックは使わない。
+                judgment: TechJev = {
+                    "status": "ok",
+                    "tech_label": "excluded",
+                    "tech_prob": excluded["tech_prob"],
+                    "topic": None,
+                    "topic_prob": None,
+                }
+                known[excluded["id"]] = judgment
+        for item in entries:
+            jev = known.get(item["article_key"])
+            if jev and jev["status"] == "ok":
+                item["jev"] = jev
+
     # GitHub トレンド
     if wanted("github"):
         try:
@@ -292,6 +329,7 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
             out["github"] = [
                 to_repo_item(r, rank, streaks["github"]) for rank, r in enumerate(repos, 1)
             ]
+            restore_judgments("github", out["github"])
             out["status"]["github"] = "ok" if out["github"] else "none"
             if note:
                 out["notes"]["github"] = note
@@ -307,6 +345,7 @@ def collect(http: httpx.Client, day: date) -> SourcesFile:
         try:
             items = fetch_ranking(fetcher, source)
             entries = [to_ranking_item(i, rank, streaks[name]) for rank, i in enumerate(items, 1)]
+            restore_judgments(name, entries)
             top = source["top"]
             out[name] = entries[:top]
             if name != "devio":

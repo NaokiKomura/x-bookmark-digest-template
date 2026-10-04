@@ -52,7 +52,6 @@ from scripts.lib.store import (
 
 TECH_QUESTION_ID = "is_tech"
 TOPIC_QUESTION_ID = "topic"
-RANKING_TOP = 10
 
 State = dict[str, Any]
 RawAnswer = dict[str, Any]
@@ -274,11 +273,12 @@ def classify_ranking(
     fetch_reserve_article: Callable[[RankingItem], object],
 ) -> None:
     """Qiita・Zenn: テック判定で除外したものを外し、10件を割ったら次点から補充する。"""
+    top = int(load_config("sources.json")[name]["top"])
     kept: list[RankingItem] = []
     queue: list[RankingItem] = list(sources[name])
     reserve_lists = sources.get("reserve")
     reserve: list[RankingItem] = list(reserve_lists[name]) if reserve_lists else []
-    while queue or (reserve and len(kept) < RANKING_TOP):
+    while queue or (reserve and len(kept) < top):
         if queue:
             item = queue.pop(0)
         else:
@@ -301,7 +301,7 @@ def classify_ranking(
             )
             continue
         kept.append(item)
-    sources[name] = kept[:RANKING_TOP]
+    sources[name] = kept[:top]
 
 
 def classify_topic_only(sources: SourcesFile, clf: Classifier, conf: dict[str, Any]) -> None:

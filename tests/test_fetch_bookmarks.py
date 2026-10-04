@@ -150,7 +150,7 @@ def test_main_writes_empty_file_and_updates_seen(digest_root, monkeypatch):
     monkeypatch.setenv("X_REFRESH_TOKEN", "RT")
     (digest_root / "state" / "seen_ids.json").write_text('{"ids": ["old"]}')
     monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("AT", "RT2"))
-    monkeypatch.setattr(fb, "fetch_new_bookmarks", lambda *a: [])
+    monkeypatch.setattr(fb, "fetch_new_bookmarks", lambda *a, **kw: fb.BookmarkBatch())
     assert fb.main([]) == 0
     data = json.loads((digest_root / "data" / "2026-10-03.json").read_text())
     assert data["posts"] == [] and data["date"] == "2026-10-03"
@@ -168,7 +168,7 @@ def test_api_error_is_recorded_and_seen_kept(digest_root, monkeypatch):
     (digest_root / "state" / "seen_ids.json").write_text('{"ids": ["old"]}')
     monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("AT", "RT2"))
 
-    def fail(*a):
+    def fail(*a, **kw):
         raise fb.BookmarksFetchError("HTTP 503")
 
     monkeypatch.setattr(fb, "fetch_new_bookmarks", fail)
@@ -177,3 +177,64 @@ def test_api_error_is_recorded_and_seen_kept(digest_root, monkeypatch):
     assert "503" in data["error"]
     assert "bookmarks_error=1" in out.read_text()
     assert json.loads((digest_root / "state" / "seen_ids.json").read_text())["ids"] == ["old"]
+
+
+def test_main_resumes_large_batch_without_losing_older_bookmarks(digest_root, monkeypatch):
+    monkeypatch.setenv("X_CLIENT_ID", "cid")
+    monkeypatch.setenv("X_USER_ID", "me")
+    monkeypatch.setenv("X_REFRESH_TOKEN", "fake")
+    monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("fake", "fake"))
+    monkeypatch.setattr(fb, "save_refresh_token", lambda *a: None)
+    ids = [str(i) for i in range(250, 0, -1)]
+
+    def handler(request):
+        offset = int(request.url.params.get("pagination_token", "0"))
+        body = {"data": [tweet(i) for i in ids[offset : offset + 20]], "meta": {}}
+        if offset + 20 < len(ids):
+            body["meta"]["next_token"] = str(offset + 20)
+        return httpx.Response(200, json=body)
+
+    client_type = httpx.Client
+    client = client_type(transport=httpx.MockTransport(handler))
+    monkeypatch.setattr(fb.httpx, "Client", lambda **kw: client)
+    assert fb.main([]) == 0
+    state = json.loads(fb.seen_ids_path().read_text())
+    assert len(state["pending_ids"]) == 200 and state["ids"] == []
+    assert state["pagination_token"] == "200"
+    assert json.loads(fb.bookmarks_path(fb.today_jst()).read_text())["incomplete"]
+    # 次の日に続きを取得する。最初の日の200件を重ねて載せない。
+    monkeypatch.setenv("DIGEST_DATE", "2026-10-04")
+    client = client_type(transport=httpx.MockTransport(handler))
+    assert fb.main([]) == 0
+    state = json.loads(fb.seen_ids_path().read_text())
+    assert len(state["ids"]) == 250 and "pagination_token" not in state
+    data = json.loads(fb.bookmarks_path(fb.today_jst()).read_text())
+    assert len(data["posts"]) == 50 and not data["incomplete"]
+
+
+def test_expired_cursor_preserves_boundary_and_pending_ids(digest_root, monkeypatch):
+    monkeypatch.setenv("X_CLIENT_ID", "cid")
+    monkeypatch.setenv("X_USER_ID", "me")
+    monkeypatch.setenv("X_REFRESH_TOKEN", "fake")
+    monkeypatch.setattr(fb.x_oauth, "refresh", lambda *a: ("fake", "fake"))
+    monkeypatch.setattr(fb, "save_refresh_token", lambda *a: None)
+    fb.write_json(
+        fb.seen_ids_path(), {"ids": ["1"], "pending_ids": ["3"], "pagination_token": "expired"}
+    )
+
+    def fail(*a, **kw):
+        raise fb.BookmarksFetchError("HTTP 400", 400)
+
+    monkeypatch.setattr(fb, "fetch_new_bookmarks", fail)
+    assert fb.main([]) == 0
+    assert json.loads(fb.seen_ids_path().read_text()) == {"ids": ["1"], "pending_ids": ["3"]}
+    monkeypatch.setattr(
+        fb,
+        "fetch_new_bookmarks",
+        lambda *a, **kw: fb.BookmarkBatch([fb.to_post(tweet(i), {}, {}) for i in ("3", "2")]),
+    )
+    assert fb.main([]) == 0
+    assert [
+        p["id"] for p in json.loads(fb.bookmarks_path(fb.today_jst()).read_text())["posts"]
+    ] == ["2"]
+    assert json.loads(fb.seen_ids_path().read_text())["ids"] == ["3", "2", "1"]
