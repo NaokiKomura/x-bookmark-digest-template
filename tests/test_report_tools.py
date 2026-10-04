@@ -97,3 +97,57 @@ def test_validate_checks_section_summaries():
     assert data["section_summaries"]["blogs"]
     data["section_summaries"] = {"blogs": 1, "other": "x"}
     assert any("section_summaries" in e for e in rt.validate_data(data))
+
+
+def write_report(reports, day, data):
+    data = {**data, "date": day}
+    src = reports / f"{day}.json"
+    src.write_text(json.dumps(data, ensure_ascii=False))
+    rt.cmd_build(src, reports / f"{day}.html")
+
+
+def test_carryover_takes_the_three_previous_days_only(tmp_path):
+    base = {k: v for k, v in sample().items() if k != "carryover"}
+    for day in ("2026-10-09", "2026-10-08", "2026-10-07", "2026-10-06"):
+        write_report(tmp_path, day, base)
+    carry = rt.cmd_carryover("2026-10-10", tmp_path)
+    assert [c["date"] for c in carry] == ["2026-10-09", "2026-10-08", "2026-10-07"]
+    assert set(carry[0]) == {"date", *rt.CARRY_SECTIONS}
+    assert [p["id"] for p in carry[0]["posts"]] == [p["id"] for p in base["posts"]]
+
+
+def test_carryover_does_not_carry_a_reports_own_carryover(tmp_path):
+    write_report(
+        tmp_path, "2026-10-03", sample()
+    )  # サンプルは 2026-10-02 分の繰り越し（c1 など）を持つ
+    carry = rt.cmd_carryover("2026-10-04", tmp_path)
+    carried_ids = {item["id"] for section in rt.CARRY_SECTIONS for item in carry[0][section]}
+    assert "c1" not in carried_ids
+
+
+def test_carryover_skips_missing_days_and_invalid_items(tmp_path):
+    data = {k: v for k, v in sample().items() if k != "carryover"}
+    write_report(tmp_path, "2026-10-08", data)
+    html = tmp_path / "2026-10-08.html"
+    broken = rt.extract_data(html.read_text())
+    broken["posts"][0]["theme"] = "not_a_topic"
+    html.write_text(
+        rt.BLOCK.sub(lambda m: m.group(1) + rt.embed(broken) + m.group(3), html.read_text())
+    )
+    carry = rt.cmd_carryover("2026-10-10", tmp_path)
+    assert [c["date"] for c in carry] == ["2026-10-08"]
+    assert broken["posts"][0]["id"] not in [p["id"] for p in carry[0]["posts"]]
+    assert rt.cmd_carryover("2026-10-20", tmp_path) == []
+
+
+def test_validate_checks_carryover():
+    data = sample()
+    assert rt.validate_data({**data, "carryover": []}) == []
+    future = [{"date": data["date"], "posts": []}]
+    assert any("carryover.date" in e for e in rt.validate_data({**data, "carryover": future}))
+    bad = [{"date": "2026-10-01", "posts": [{**data["posts"][0], "url": "javascript:alert(1)"}]}]
+    assert any(
+        e.startswith("carryover 2026-10-01") for e in rt.validate_data({**data, "carryover": bad})
+    )
+    four = [{"date": f"2026-09-2{i}"} for i in range(4)]
+    assert any("3日分まで" in e for e in rt.validate_data({**data, "carryover": four}))

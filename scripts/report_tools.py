@@ -7,6 +7,7 @@ python3 scripts/report_tools.py trend   YYYY-MM-DD            直近14日のブ�
 python3 scripts/report_tools.py keywords [--reports DIR]      直近のレポートで使ったキーワードの一覧（表記の統一用）
 python3 scripts/report_tools.py build   DATA.json OUT.html    テンプレートの report-data だけを差し替える
 python3 scripts/report_tools.py validate OUT.html             差し替えたHTMLを検証する（公開の前に必ず通す）
+python3 scripts/report_tools.py carryover YYYY-MM-DD [--reports DIR]  前日から3日前までのレポートの項目（report-data の carryover）
 """
 
 from __future__ import annotations
@@ -30,6 +31,10 @@ SOURCE_STATES = {"ok", "none", "error"}
 EXCLUDED_SOURCES = {"bookmarks", "qiita", "zenn"}
 SOURCE_NAMES = {"bookmarks", "blogs", "github", "qiita", "zenn", "devio"}
 MAX_READ_MIN = 15
+CARRY_DAYS = 3
+"""未読の項目を翌日以降のレポートに繰り越す日数（元の日から数える）。"""
+CARRY_SECTIONS = ("posts", "blogs", "github", "articles")
+DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def is_number(x: Any) -> bool:
@@ -121,6 +126,53 @@ def cmd_keywords(reports_dir: Path, limit: int = 7) -> dict[str, int]:
                 for k in item.get("keywords", []):
                     counts[k] = counts.get(k, 0) + 1
     return dict(sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
+# ---------- 繰り越し ----------
+
+
+def item_errors(section: str, item: Any) -> list[str]:
+    """report-data の1項目を、その項目だけを持つレポートとして検証する。"""
+    if not isinstance(item, dict):
+        return ["項目がオブジェクトでない"]
+    report: dict[str, Any] = {
+        "date": "2000-01-01",
+        "lede": "",
+        "section_summaries": {},
+        **{key: [] for key in ("themes", "picks", "trend", "source_status", "excluded")},
+        **{key: [] for key in CARRY_SECTIONS},
+    }
+    report[section] = [item]
+    return validate_data(report)
+
+
+def cmd_carryover(day: str, reports_dir: Path) -> list[dict[str, Any]]:
+    """前日から CARRY_DAYS 日前までのレポートの項目。前日のレポートの繰り越し分は含めない（最大3日にするため）。
+
+    レポートがない日、日付が合わない日、今の形で検証を通らない項目は飛ばす。
+    どれを表示するか（既読でないもの）は、閲覧者のブラウザでテンプレートが決める。
+    """
+    end = date.fromisoformat(day)
+    out: list[dict[str, Any]] = []
+    for i in range(1, CARRY_DAYS + 1):
+        d = (end - timedelta(days=i)).isoformat()
+        path = reports_dir / f"{d}.html"
+        if not path.is_file():
+            continue
+        data = extract_data(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict) or data.get("date") != d:
+            continue
+        entry: dict[str, Any] = {"date": d}
+        for section in CARRY_SECTIONS:
+            items = data.get(section)
+            entry[section] = [
+                item
+                for item in (items if isinstance(items, list) else [])
+                if not item_errors(section, item)
+            ]
+        if any(entry[section] for section in CARRY_SECTIONS):
+            out.append(entry)
+    return out
 
 
 # ---------- 組み立てと検証 ----------
@@ -335,6 +387,29 @@ def validate_data(data: Any) -> list[str]:
     for pid in data["picks"]:
         need(pid in ids, f"picks に存在しない項目: {pid}")
     need(len(data["picks"]) <= 3, "picks は3件まで")
+    errors += validate_carryover(data.get("carryover", []), str(data["date"]))
+    return errors
+
+
+def validate_carryover(carry: Any, day: str) -> list[str]:
+    """carryover は任意。当日より前の日ごとに、その日のレポートの posts・blogs・github・articles を持つ。"""
+    if not isinstance(carry, list) or len(carry) > CARRY_DAYS:
+        return [f"carryover は{CARRY_DAYS}日分までの配列"]
+    errors: list[str] = []
+    for entry in carry:
+        if not isinstance(entry, dict):
+            errors.append("carryover の要素がオブジェクトでない")
+            continue
+        d = str(entry.get("date", ""))
+        if not DATE_RE.fullmatch(d) or d >= day:
+            errors.append(f"carryover.date は当日より前の YYYY-MM-DD: {d}")
+        for section in CARRY_SECTIONS:
+            items = entry.get(section, [])
+            if not isinstance(items, list):
+                errors.append(f"carryover {d}: {section} が配列でない")
+                continue
+            for item in items:
+                errors += [f"carryover {d}: {e}" for e in item_errors(section, item)]
     return errors
 
 
@@ -365,6 +440,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("out")
     p = sub.add_parser("validate")
     p.add_argument("html")
+    p = sub.add_parser("carryover")
+    p.add_argument("date")
+    p.add_argument("--reports", default="reports")
     args = parser.parse_args(argv)
 
     if args.cmd == "inputs":
@@ -376,6 +454,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "build":
         cmd_build(Path(args.data), Path(args.out))
         print(f"wrote {args.out}")
+    elif args.cmd == "carryover":
+        print(json.dumps(cmd_carryover(args.date, Path(args.reports)), ensure_ascii=False))
     elif args.cmd == "validate":
         errors = cmd_validate(Path(args.html))
         if errors:

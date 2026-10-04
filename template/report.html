@@ -169,8 +169,16 @@ body:not(.v-overview) .group:first-child,body:not(.v-overview) .company:first-ch
 .foot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;font-size:13px;color:var(--ink3)}
 .must{color:var(--c);font-weight:500}
 .foot a{color:var(--ink);font-weight:500}
-.readbtn{font:inherit;font-size:13px;margin-left:auto;padding:3px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--ink2);cursor:pointer}
-.readbtn[aria-pressed="true"]{color:var(--ink3);border-style:dashed}
+/* 既読ボタン: 閉じたカードでも見出しの下に出し、指で押しやすい大きさにする */
+.readbtn{font:inherit;font-size:14px;font-weight:500;line-height:1.2;margin-left:auto;min-height:40px;min-width:7.5em;padding:6px 16px;border-radius:999px;border:1.5px solid var(--ink3);background:var(--paper);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;touch-action:manipulation}
+.readbtn:hover{background:color-mix(in srgb,var(--ink) 7%,var(--paper))}
+.readbtn:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.readbtn[aria-pressed="true"]{font-weight:400;color:var(--ink3);border:1.5px dashed var(--line);background:transparent}
+@media (pointer:coarse){.readbtn{min-height:44px}}
+.carried{font-size:11px;font-weight:500;color:var(--ink2);border:1px solid var(--line);border-radius:4px;padding:0 6px}
+.carry-group{margin-top:18px}
+.carry-group>h3{font-size:16px;font-weight:700;margin:0 0 4px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.carry-note{margin:-6px 0 18px}
 .item.is-read h4,.item.is-read .rt{color:var(--ink3)}
 .company{margin-top:22px}
 .company h3{font-size:17px;font-weight:700;margin:0 0 4px;padding-bottom:6px;border-bottom:1px solid var(--line)}
@@ -354,6 +362,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       <h1>ブックマーク日報</h1>
       <div class="lede-box"><p class="lede-label">今日のまとめ</p><p class="lede" id="lede"></p></div>
       <p class="meta" id="meta"></p>
+      <p class="carry-note" id="carry-note" hidden></p>
       <p class="sample" id="sample" hidden>これはサンプルデータです。ルーチンが毎朝この内容を差し替えます。</p>
     </header>
 
@@ -401,6 +410,12 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       <ol class="gh" id="github"></ol>
     </div>
     <div class="cols" id="cols"></div>
+  </section>
+
+  <section id="sec-carry" hidden>
+    <div class="sec-head"><h2>前日までの未読</h2><span class="n" id="n-carry"></span></div>
+    <p class="sub">既読にしなかった項目を、元の日から最大3日間ここに残します。既読にすると、翌日からは出なくなります。</p>
+    <div id="carry"></div>
   </section>
 
   <p class="empty" id="empty" hidden>この条件に当てはまる項目はありません。</p>
@@ -527,6 +542,27 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
  "excluded": [
   {"source": "bookmarks", "title": "週末に行った喫茶店のナポリタンがとてもおいしかった", "tech_prob": 0.04, "url": "https://x.com/"},
   {"source": "zenn", "title": "（サンプル）フリーランス1年目の確定申告", "tech_prob": 0.31, "url": "https://zenn.dev/"}
+ ],
+ "carryover": [
+  {"date": "2026-10-02",
+   "posts": [
+    {"id": "c1", "theme": "devtools", "author": "森", "handle": "mori_dev", "url": "https://x.com/mori_dev/status/1839700000000000001",
+     "kind": "post", "title": "（前日の未読サンプル）差分の小さいコミットはレビューの往復を減らす",
+     "points": ["1つのコミットに1つの目的を入れる", "レビューの指摘が局所的になり、直す範囲も小さくなる"],
+     "keywords": ["コードレビュー", "Git"], "importance": 2, "read_min": 1}
+   ],
+   "blogs": [
+    {"id": "cb1", "company": "aws", "company_label": "AWS", "blog": "AWS News Blog", "theme": "cloud_infra",
+     "title": "（前日の未読サンプル）マネージドのキューに再試行の上限を設定できるようになった", "url": "https://aws.amazon.com/blogs/aws/",
+     "points": ["失敗したメッセージを何回まで再試行するかを指定できる"], "keywords": ["キュー"], "importance": 1, "read_min": 3, "fetch_status": "ok"}
+   ],
+   "github": [
+    {"id": "cg1", "rank": 4, "title": "example/log-viewer", "url": "https://github.com/trending", "language": "Rust", "stars_today": 310, "stars_total": 5200, "theme": "devtools", "streak_days": 1,
+     "summary": "大きなログファイルを端末で絞り込みながら読むためのビューア。"}
+   ],
+   "articles": [
+    {"id": "cq1", "site": "zenn", "rank": 5, "title": "（前日の未読サンプル）型の境界でバリデーションを一か所にまとめる", "url": "https://zenn.dev/", "theme": "backend", "streak_days": 1, "summary": "入力の検証を API の境界に集めて、内側の関数では型を信じる設計の紹介。"}
+   ]}
  ]
 }
 </script>
@@ -1062,15 +1098,21 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     return a;
   }
   function setOpen(a, open){ a._open = open; a._tg.setAttribute('aria-expanded', String(open)); a._body.hidden = !open; a.classList.toggle('open', open); }
-  function foldAll(open){ items.forEach(function(p){ var pe = itemEls[p.id]; if (pe && pe._tg && !pe.hidden) setOpen(pe, open); }); revealVisible(); }
+  function foldAll(open){ allItems.forEach(function(p){ var pe = itemEls[p.id]; if (pe && pe._tg && !pe.hidden) setOpen(pe, open); }); revealVisible(); }
   function mustEl(p){ return p.importance >= 3 ? el('span', {'class': 'must'}, '必読') : null; }
+  function carriedEl(p){
+    if (!p._carried) return null;
+    var d = p._carried.split('-');
+    return el('span', {'class': 'carried'}, Number(d[1]) + '/' + Number(d[2]) + 'から繰り越し');
+  }
   var KIND_LABEL = {article: '記事あり', quote: '引用', quote_article: '引用・記事あり'};
 
   function renderPost(p){
     var who = el('p', {'class': 'who'});
     who.appendChild(el('span', null, (p.author || '') + '  @' + (p.handle || '')));
-    var meta = [mustEl(p), el('span', null, '約' + (p.read_min || 1) + '分'), KIND_LABEL[p.kind] ? el('span', null, KIND_LABEL[p.kind]) : null];
+    var ce = carriedEl(p); if (ce) who.appendChild(ce);
     var rb = readButton(p);
+    var meta = [mustEl(p), el('span', null, '約' + (p.read_min || 1) + '分'), KIND_LABEL[p.kind] ? el('span', null, KIND_LABEL[p.kind]) : null, rb];
     var a = makeCard(p, who, meta, function(body){
       if (p.article) {
         var r = el('div', {'class': 'ref'});
@@ -1094,7 +1136,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       var kws = keywordsEl(p); if (kws) body.appendChild(kws);
       var f = el('div', {'class': 'foot'});
       if (safeUrl(p.url)) f.appendChild(link(p.url, 'Xで開く'));
-      f.appendChild(rb); body.appendChild(f);
+      body.appendChild(f);
     });
     register(p, a, rb);
     return a;
@@ -1123,6 +1165,30 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   else if (!posts.length) bmWrap.appendChild(el('p', {'class': 'sub'}, '新着のブックマークはありません。'));
 
   // ---------- 公式テックブログ ----------
+  function renderBlog(p){
+    var who = el('p', {'class': 'who'});
+    who.appendChild(el('span', {'class': 'tdot', 'aria-hidden': 'true'}));
+    var co = p._carried && (p.blog || '').indexOf(p.company_label) !== 0 ? p.company_label + ' ' : '';
+    who.appendChild(el('span', null, co + p.blog + '・' + (tName[p.theme] || '')));
+    var ce = carriedEl(p); if (ce) who.appendChild(ce);
+    var rb = readButton(p), f = el('div', {'class': 'foot'}), a;
+    if (safeUrl(p.url)) f.appendChild(link(p.url, '記事を開く'));
+    // 本文を取れなかった記事は見出しとリンクだけにする（開く中身がないので畳まない）
+    if (p.fetch_status === 'blocked' || p.fetch_status === 'error') {
+      f.appendChild(rb);
+      a = el('article', {'class': 'item head-only', 'id': 'item-' + p.id});
+      a.appendChild(who); a.appendChild(el('h4', null, p.title)); a.appendChild(f);
+    } else {
+      a = makeCard(p, who, [mustEl(p), p.read_min ? el('span', null, '約' + p.read_min + '分') : null, rb], function(body){
+        var vz = renderVisual(p.visual); if (vz) { body.appendChild(vz); watch(vz); }
+        var ul = points(p); if (ul) body.appendChild(ul);
+        var kws = keywordsEl(p); if (kws) body.appendChild(kws);
+        if (f.firstChild) body.appendChild(f);
+      });
+    }
+    register(p, a, rb);
+    return a;
+  }
   var blogWrap = document.getElementById('blogs'), blogs = D.blogs || [];
   document.getElementById('n-blogs').textContent = blogs.length + '件';
   var companies = D.blog_companies || [];
@@ -1134,27 +1200,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     if (!list.length) {
       box.appendChild(el('p', {'class': 'none' + (c.status === 'error' ? ' err' : '')}, c.status === 'error' ? '取得失敗' : '更新なし'));
     }
-    list.forEach(function(p){
-      var who = el('p', {'class': 'who'});
-      who.appendChild(el('span', {'class': 'tdot', 'aria-hidden': 'true'}));
-      who.appendChild(el('span', null, p.blog + '・' + (tName[p.theme] || '')));
-      var rb = readButton(p), f = el('div', {'class': 'foot'}), a;
-      if (safeUrl(p.url)) f.appendChild(link(p.url, '記事を開く'));
-      f.appendChild(rb);
-      // 本文を取れなかった記事は見出しとリンクだけにする（開く中身がないので畳まない）
-      if (p.fetch_status === 'blocked' || p.fetch_status === 'error') {
-        a = el('article', {'class': 'item head-only', 'id': 'item-' + p.id});
-        a.appendChild(who); a.appendChild(el('h4', null, p.title)); a.appendChild(f);
-      } else {
-        a = makeCard(p, who, [mustEl(p), p.read_min ? el('span', null, '約' + p.read_min + '分') : null], function(body){
-          var vz = renderVisual(p.visual); if (vz) { body.appendChild(vz); watch(vz); }
-          var ul = points(p); if (ul) body.appendChild(ul);
-          var kws = keywordsEl(p); if (kws) body.appendChild(kws);
-          body.appendChild(f);
-        });
-      }
-      register(p, a, rb); box.appendChild(a);
-    });
+    list.forEach(function(p){ box.appendChild(renderBlog(p)); });
     box._list = list; box._key = 'blog:' + c.company; groups.push(box); blogWrap.appendChild(box);
   });
   if (!companies.length) blogWrap.appendChild(el('p', {'class': 'sub'}, '新着はありません。'));
@@ -1165,14 +1211,14 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   if (gst && gst.status === 'error') { var fg = document.getElementById('fail-github'); fg.hidden = false; fg.textContent = '取得失敗' + (gst.message ? '：' + gst.message : ''); }
   if (gst && gst.note) { var ng = document.getElementById('note-github'); ng.hidden = false; ng.textContent = gst.note; }
   var ghMax = Math.max.apply(null, gh.map(function(r){ return r.stars_today || 0; }).concat([1]));
-  gh.forEach(function(p){
+  function renderRepo(p){
     var li = el('li', {'class': 'item', 'id': 'item-' + p.id});
     li.appendChild(el('span', {'class': 'rank'}, p.rank));
     var body = el('div');
     var t = el('div', {'class': 'rt'}); t.appendChild(link(p.url, p.title)); body.appendChild(t);
     if (num(p.stars_today)) {
       var bar = el('div', {'class': 'gbar'}), tr = el('div', {'class': 'track'}), fill = el('div', {'class': 'fill'});
-      fill.style.setProperty('--s', p.stars_today / ghMax); tr.appendChild(fill); bar.appendChild(tr);
+      fill.style.setProperty('--s', Math.min(1, p.stars_today / ghMax)); tr.appendChild(fill); bar.appendChild(tr);
       bar.appendChild(el('span', {'class': 'v'}, '+' + fmt(p.stars_today))); body.appendChild(bar);
     }
     if (p.summary) body.appendChild(el('p', {'class': 'gsum'}, p.summary));
@@ -1182,12 +1228,15 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     if (p.language) m.appendChild(el('span', null, p.language));
     if (num(p.stars_total)) m.appendChild(el('span', null, '★' + fmt(p.stars_total)));
     if (p.streak_days >= 2) m.appendChild(el('span', {'class': 'streak'}, '連続' + p.streak_days + '日目'));
+    var ce = carriedEl(p); if (ce) m.appendChild(ce);
     body.appendChild(m);
     li.appendChild(body);
     var vz = renderVisual(p.visual); if (vz) { li.appendChild(vz); vz.style.gridColumn = '2'; watch(vz); }
     var f = el('div', {'class': 'foot'}); var rb = readButton(p); f.appendChild(rb); li.appendChild(f);
-    register(p, li, rb); ghList.appendChild(li);
-  });
+    register(p, li, rb);
+    return li;
+  }
+  gh.forEach(function(p){ ghList.appendChild(renderRepo(p)); });
   if (!gh.length && !(gst && gst.status === 'error')) ghList.appendChild(el('li', {'class': 'sub'}, '今日のデータはありません。'));
   var ghGroup = document.getElementById('sec-github'); ghGroup._list = gh; ghGroup._key = 'tr:github'; groups.push(ghGroup);
 
@@ -1201,7 +1250,10 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     if (st && st.status === 'error') col.appendChild(el('p', {'class': 'fail'}, '取得失敗' + (st.message ? '：' + st.message : '')));
     else if (!list.length) col.appendChild(el('p', {'class': 'sub'}, '今日のデータはありません。'));
     var ol = el('ol');
-    list.forEach(function(p){
+    list.forEach(function(p){ ol.appendChild(renderArticle(p)); });
+    col.appendChild(ol); col._list = list; col._key = 'tr:' + site; groups.push(col); cols.appendChild(col);
+  });
+  function renderArticle(p){
       var li = el('li', {'class': 'item', 'id': 'item-' + p.id});
       li.appendChild(el('span', {'class': 'rank'}, p.rank));
       var body = el('div');
@@ -1212,13 +1264,44 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       m.appendChild(el('span', null, tName[p.theme] || ''));
       if (num(p.likes)) m.appendChild(el('span', null, '♥' + fmt(p.likes)));
       if (p.streak_days >= 2) m.appendChild(el('span', {'class': 'streak'}, '連続' + p.streak_days + '日目'));
+      if (p._carried) { m.appendChild(el('span', null, SRC[p._src])); m.appendChild(carriedEl(p)); }
       body.appendChild(m); li.appendChild(body);
       var vz = renderVisual(p.visual); if (vz) { li.appendChild(vz); watch(vz); }
       var f = el('div', {'class': 'foot'}); var rb = readButton(p); f.appendChild(rb); li.appendChild(f);
-      register(p, li, rb); ol.appendChild(li);
+      register(p, li, rb);
+      return li;
+  }
+
+  // ---------- 前日までの未読（繰り越し） ----------
+  // ルーチンが前日から3日前までのレポートの項目を carryover に入れる。この端末で既読にしたもの、
+  // 今日のレポートにもあるもの、より新しい日に出たものは出さない
+  var carried = [], seenIds = {};
+  items.forEach(function(p){ seenIds[p.id] = 1; });
+  (D.carryover || []).slice().sort(function(a, b){ return a.date < b.date ? 1 : -1; }).forEach(function(day){
+    [['posts', 'bookmarks'], ['blogs', 'blogs'], ['github', 'github'], ['articles', null]].forEach(function(s){
+      (day[s[0]] || []).forEach(function(p){
+        if (!p || !p.id || seenIds[p.id] || read[p.id]) return;
+        seenIds[p.id] = 1; p._src = s[1] || p.site; p._carried = day.date; carried.push(p); byId[p.id] = p;
+      });
     });
-    col.appendChild(ol); col._list = list; col._key = 'tr:' + site; groups.push(col); cols.appendChild(col);
   });
+  var carryWrap = document.getElementById('carry'), CARRY_TREND = ['github', 'qiita', 'zenn', 'devio'];
+  [['bookmarks', 'ブックマーク'], ['blogs', '公式ブログ'], ['trends', 'トレンド']].forEach(function(g){
+    var list = carried.filter(function(p){ return g[0] === 'trends' ? CARRY_TREND.indexOf(p._src) >= 0 : p._src === g[0]; });
+    if (!list.length) return;
+    var box = el('div', {'class': 'carry-group'});
+    box.appendChild(el('h3', null, g[1]));
+    if (g[0] === 'bookmarks') list.forEach(function(p){ box.appendChild(renderPost(p)); });
+    else if (g[0] === 'blogs') list.forEach(function(p){ box.appendChild(renderBlog(p)); });
+    else {
+      var ghs = list.filter(function(p){ return p._src === 'github'; }), arts = list.filter(function(p){ return p._src !== 'github'; });
+      if (ghs.length) { var gol = el('ol', {'class': 'gh'}); ghs.forEach(function(p){ gol.appendChild(renderRepo(p)); }); box.appendChild(gol); }
+      if (arts.length) { var ac = el('div', {'class': 'col'}), aol = el('ol'); arts.forEach(function(p){ aol.appendChild(renderArticle(p)); }); ac.appendChild(aol); box.appendChild(ac); }
+    }
+    box._list = list; box._key = 'co'; groups.push(box); carryWrap.appendChild(box);
+  });
+  document.getElementById('n-carry').textContent = carried.length + '件';
+  var allItems = items.concat(carried);
 
   // ---------- 推移グラフ ----------
   var tr = D.trend || [], tsvg = document.getElementById('trend');
@@ -1245,6 +1328,9 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   function inView(p, view){
     var i = view.indexOf(':'), kind = i < 0 ? view : view.slice(0, i), key = i < 0 ? '' : view.slice(i + 1);
     if (kind === 'search') return matchesQuery(p);
+    if (kind === 'co') return !!p._carried;
+    // 繰り越しは「前日までの未読」と検索でだけ出す（今日の件数や話題マップに混ぜない）
+    if (p._carried) return false;
     if (kind === 'filter') return (!state.theme || p.theme === state.theme) && (!state.keyword || (p.keywords || []).indexOf(state.keyword) >= 0);
     if (kind === 'bm') return p._src === 'bookmarks' && (!key || p.theme === key);
     if (kind === 'blog') return p._src === 'blogs' && (!key || p.company === key);
@@ -1254,6 +1340,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   var companies2 = (D.blog_companies && D.blog_companies.length) ? D.blog_companies
     : (D.blogs || []).reduce(function(a, b){ if (!a.some(function(c){ return c.company === b.company; })) a.push({company: b.company, label: b.company_label, status: 'ok'}); return a; }, []);
   var NAV = [{view: 'overview', label: '概要', top: true}];
+  if (carried.length) NAV.push({view: 'co', label: '前日までの未読', top: true});
   NAV.push({view: 'bm', label: 'ブックマーク', top: true, grp: true, status: statusBy.bookmarks && statusBy.bookmarks.status});
   themeIds.forEach(function(id){ if ((D.posts || []).some(function(p){ return p.theme === id; })) NAV.push({view: 'bm:' + id, label: tName[id], theme: id}); });
   // 初回セットアップで外した情報源はデータに出てこないので、サイドバーにも出さない
@@ -1283,7 +1370,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       n.btn.setAttribute('aria-current', state.view === n.view ? 'page' : 'false');
       n.cnt.textContent = ''; n.cnt.className = 'cnt';
       if (n.view === 'overview') return;
-      var list = items.filter(function(p){ return inView(p, n.view); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
+      var list = allItems.filter(function(p){ return inView(p, n.view); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       if (!list.length) { n.cnt.textContent = n.status === 'error' ? '取得失敗' : '更新なし'; if (n.status === 'error') n.cnt.classList.add('err'); return; }
       if (!unread) { n.cnt.textContent = '✓ ' + list.length; n.cnt.classList.add('done'); return; }
       n.cnt.appendChild(el('b', null, String(unread)));
@@ -1311,7 +1398,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   // ---------- キーワード検索 ----------
   // 見出し・要点・キーワード・概要・投稿者・記事名・引用元を対象に、空白で区切ったすべての語を含む項目を出す
   var qInput = document.getElementById('q'), qCount = document.getElementById('q-n'), qTimer;
-  items.forEach(function(p){
+  allItems.forEach(function(p){
     p._text = [p.title, p.summary, p.author, p.handle, p.company_label, p.blog, SRC[p._src], tName[p.theme],
       (p.points || []).join(' '), (p.keywords || []).join(' '), p.article && p.article.title, p.quoted && p.quoted.claim]
       .filter(Boolean).join(' ').toLowerCase();
@@ -1320,7 +1407,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   function matchesQuery(p){ return terms().every(function(t){ return p._text.indexOf(t) >= 0; }); }
   function runSearch(){
     state.query = qInput.value.trim();
-    if (state.query) { setView('search'); qCount.textContent = items.filter(matchesQuery).length + '件見つかりました'; }
+    if (state.query) { setView('search'); qCount.textContent = allItems.filter(matchesQuery).length + '件見つかりました'; }
     else { qCount.textContent = ''; if (state.view === 'search') setView('overview'); }
   }
   qInput.addEventListener('input', function(){ clearTimeout(qTimer); qTimer = setTimeout(runSearch, 150); });
@@ -1338,7 +1425,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     if (ov && mapDetail.firstChild) { var cur = topicStats.filter(function(t){ return tmEls[t.id] && tmEls[t.id].classList.contains('on'); })[0]; if (cur) showTopic(cur); }
 
     var shown = 0;
-    items.forEach(function(p){
+    allItems.forEach(function(p){
       var isRead = !!read[p.id], pe = itemEls[p.id];
       if (pe) {
         pe.classList.toggle('is-read', isRead);
@@ -1354,13 +1441,16 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
       var own = v === g._key || v === g._key.split(':')[0];
       g.hidden = !(any || (own && !g._list.length));
     });
-    [['sec-bookmarks', 'bm'], ['sec-blogs', 'blog'], ['sec-trends', 'tr']].forEach(function(s){
+    [['sec-bookmarks', 'bm'], ['sec-blogs', 'blog'], ['sec-trends', 'tr'], ['sec-carry', 'co']].forEach(function(s){
       var sec = document.getElementById(s[0]);
       sec.hidden = !(groups.some(function(g){ return !g.hidden && sec.contains(g); }) || v === s[1]);
       // 1つのカテゴリだけを見ているときは、上の見出しで足りるので区切りの見出しを隠す
       sec.classList.toggle('solo', v !== 'filter' && v !== 'search');
     });
     document.getElementById('ov').hidden = !ov;
+    var cn = document.getElementById('carry-note'), cu = carried.filter(function(p){ return !read[p.id]; }).length;
+    cn.textContent = ''; cn.hidden = !cu;
+    if (cu) { var cb2 = el('button', {'type': 'button', 'class': 'clear'}, '前日までの未読 ' + cu + '件を見る'); cb2.addEventListener('click', function(){ setView('co'); }); cn.appendChild(cb2); }
     [['sum-blogs', 'blogs', 'blog'], ['sum-trends', 'trends', 'tr']].forEach(function(x){
       var box = document.getElementById(x[0]), text = (D.section_summaries || {})[x[1]];
       box.hidden = !text || v.split(':')[0] !== x[2];
@@ -1381,7 +1471,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
     }
     var vm = document.getElementById('view-meta'); vm.textContent = '';
     if (!ov) {
-      var list = items.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
+      var list = allItems.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       vm.appendChild(document.createTextNode(list.length + '件（未読 ' + unread + '件）'));
       if (v === 'filter' || v === 'search') { var cl = el('button', {'type': 'button', 'class': 'clear'}, v === 'search' ? '検索をやめる' : '絞り込みを解除'); cl.addEventListener('click', function(){ setView('overview'); }); vm.appendChild(cl); }
       if (list.some(function(p){ return itemEls[p.id] && itemEls[p.id]._tg; })) {
@@ -1396,7 +1486,7 @@ footer{margin-top:48px;font-size:13px;color:var(--ink3)}
   // 項目へ移動する。項目が属するカテゴリに切り替えてから、その位置まで送る
   function goTo(id){
     var pe = itemEls[id], p = byId[id]; if (!pe || !p) return;
-    var view = p._src === 'bookmarks' ? 'bm:' + p.theme : p._src === 'blogs' ? 'blog:' + p.company : 'tr:' + p._src;
+    var view = p._carried ? 'co' : p._src === 'bookmarks' ? 'bm:' + p.theme : p._src === 'blogs' ? 'blog:' + p.company : 'tr:' + p._src;
     if (read[id]) state.unread = false;
     setView(view);
     if (pe._tg) setOpen(pe, true);

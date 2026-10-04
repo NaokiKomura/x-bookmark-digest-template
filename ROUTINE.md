@@ -109,6 +109,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
 | source_status | 情報源ごとの結果。`{"source": "bookmarks"/"blogs"/"github"/"qiita"/"zenn"/"devio", "label", "status": "ok"/"none"/"error", "count", "message"?, "note"?}`。GitHub の `notes.github` があれば `note` に入れる。`data/sources/$DAY.json` の `status` にない情報源（初回セットアップで外したもの）は入れない |
 | excluded | 除外した項目。`{"source": "bookmarks"/"qiita"/"zenn", "title", "tech_prob", "url"}`。`data/excluded/` の項目と、守ること4の規則で自分が除外した項目。画面には出さず、記録として残す（誤判定の確認用） |
+| carryover | `python3 scripts/report_tools.py carryover "$DAY" --reports /tmp/reports/reports` の出力をそのまま使う（手順4で取り出した前日から3日前までのレポートの項目）。履歴がなければ空の配列になる。閲覧者が既読にしていないものだけを、テンプレートが「前日までの未読」に出す |
 
 `sample` は付けない。
 
@@ -160,6 +161,7 @@ python3 scripts/report_tools.py validate /tmp/report.html
 
 `lede` を「本日のデータはありません。取得ワークフロー（GitHub Actions の fetch）の実行結果を確認してください。」とし、
 `themes`、`picks`、`posts`、`blogs`、`github`、`articles`、`excluded` を空の配列、`trend` は手順5のコマンドの出力、
+`carryover` は手順4の `git archive` で履歴のレポートを取り出してから、手順5のコマンドの出力（前日までの未読を読めるようにする）、
 `source_status` はブックマークと `config/enabled.json` で選ばれている情報源（ファイルがなければ6つすべて）を `{"status": "error", "count": 0, "message": "データなし"}` にして、手順6から続ける。
 
 ### 8. 公開と保存
