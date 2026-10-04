@@ -1877,11 +1877,12 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
 
   // ---------- アカウントへの保存と端末間の同期 ----------
   // claude.ai のアーティファクトとして開いたときだけ db に保存し、ほかの端末と同期する。
-  // read/<掲載日> = {ids: {項目ID: 1}}（掲載日ごとにまとめて文書の数を抑える）、later/<項目ID> = {source, date, item}。
+  // read_items/<項目ID> = {read: true/false, date: 掲載日}。旧 read/<掲載日> は読み取り専用で引き継ぐ。
+  // later/<項目ID> = {source, date, item}。
   // 読み書きは所有者だけ（ルーチンが公開するときの db の rules）。db がない場面（手元のファイル、Codex）と
   // 所有者以外が開いた場面は、このブラウザーにだけ保存する
   // feedback/<掲載日> = {votes: {項目ID: {vote: "up"/"down", source, theme, title, keywords}}}。翌朝のルーチンが読む
-  var remoteDb = null, remoteRead = null, remoteLater = null, remoteFeedback = null, writeQueues = {};
+  var remoteDb = null, remoteRead = null, remoteReadItems = null, readMigrated = false, remoteLater = null, remoteFeedback = null, writeQueues = {};
   function itemDate(p){ return p._carried || p._savedDate || D.date; }
   function showSyncState(on){
     var text = on ? '既読・あとで読む・いいねは、アカウントに保存してほかの端末と同期します。いいねと興味なしは、翌朝の「まず読む3件」の選び方に使います。' : '既読・あとで読むは、このブラウザーに保存されます。';
@@ -1904,14 +1905,25 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     }).catch(syncFailed);
   }
   function syncRead(id, on, date){
-    if (!remoteDb || !remoteRead) return;
-    var dates = on ? [date] : Object.keys(remoteRead).filter(function(d){ return remoteRead[d][id]; });
-    dates.forEach(function(d){
-      var ids = Object.assign({}, remoteRead[d] || {});
-      if (on) ids[id] = 1; else delete ids[id];
-      remoteRead[d] = ids;
-      writeDoc('read/' + d, function(){ var cur = remoteRead[d] || {}; return Object.keys(cur).length ? {ids: cur} : null; });
-    });
+    if (!remoteDb || remoteReadItems === null) return;
+    // 項目ごとの文書にする。別の端末が別の記事を既読にしても上書きしない。
+    // 未読へ戻す操作も残し、旧 read/<日付> の記録より優先する。
+    remoteReadItems[id] = {read: on, date: date};
+    var value = remoteReadItems[id];
+    writeDoc('read_items/' + id, function(){ return value; });
+  }
+  function mergeRemoteRead(){
+    if (remoteRead === null || remoteReadItems === null) return;
+    var merged = {};
+    Object.keys(remoteRead).forEach(function(d){ Object.keys(remoteRead[d]).forEach(function(id){ merged[id] = 1; }); });
+    Object.keys(remoteReadItems).forEach(function(id){ if (remoteReadItems[id].read) merged[id] = 1; else delete merged[id]; });
+    if (!readMigrated) {
+      readMigrated = true;
+      var up = Object.keys(read).filter(function(id){ return !merged[id] && !Object.prototype.hasOwnProperty.call(remoteReadItems, id) && byId[id]; });
+      up.forEach(function(id){ merged[id] = 1; });
+      setTimeout(function(){ up.forEach(function(id){ syncRead(id, true, itemDate(byId[id])); }); }, 0);
+    }
+    read = merged; saveRead(); apply(); renderMap(); showSyncState(!!remoteDb);
   }
   function setFeedback(p, vote){
     if (!remoteDb || !remoteFeedback) return;
@@ -1933,17 +1945,14 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   function startSync(db){
     remoteDb = db;
     db.collection('read').onSnapshot(function(snap){
-      var next = {}, merged = {}, first = remoteRead === null;
+      var next = {};
       snap.docs.forEach(function(doc){ var b = doc.data(); if (b && b.ids && typeof b.ids === 'object') next[doc.id] = Object.assign({}, b.ids); });
-      remoteRead = next;
-      Object.keys(next).forEach(function(d){ Object.keys(next[d]).forEach(function(id){ merged[id] = 1; }); });
-      if (first) {
-        // この端末だけで既読にしていた、このページの項目をアカウントに移す
-        var up = Object.keys(read).filter(function(id){ return !merged[id] && byId[id]; });
-        up.forEach(function(id){ merged[id] = 1; });
-        setTimeout(function(){ up.forEach(function(id){ syncRead(id, true, itemDate(byId[id])); }); }, 0);
-      }
-      read = merged; saveRead(); apply(); renderMap(); showSyncState(!!remoteDb);
+      remoteRead = next; mergeRemoteRead();
+    }, syncFailed);
+    db.collection('read_items').onSnapshot(function(snap){
+      var next = {};
+      snap.docs.forEach(function(doc){ var b = doc.data(); if (b && typeof b.read === 'boolean') next[doc.id] = {read: b.read, date: b.date}; });
+      remoteReadItems = next; mergeRemoteRead();
     }, syncFailed);
     db.collection('later').onSnapshot(function(snap){
       var next = {}, first = remoteLater === null;
