@@ -24,7 +24,7 @@ X APIとTypeSafe AIの認証情報はGitHub Secretsにだけ置き、ルーチ�
 
 ## セットアップ
 
-手順1〜3は手で行う。手順4〜6（情報源の選択、取得ワークフロー、ルーチン）は、Claude Codeなどのコーディングエージェントでこのリポジトリを開くと、最初に設問として出る（[AGENTS.md](AGENTS.md#初回セットアップ情報源取得ワークフロールーチン)）。
+手順1〜3は手で行う。手順4〜6（情報源の選択、取得ワークフロー、ルーチン）は、Claude Codeなどのコーディングエージェントでこのリポジトリを開くと、最初に設問として出る（[docs/setup.md](docs/setup.md)。Claude Code では `/setup` でも始められる）。
 選んだものはエージェントが設定し、「あとで」を選んだ手順は下の説明のとおり自分で行う。エージェントは取得ワークフローを有効にする前にSecretsがそろっているかを確かめるので、先に手順2・3を済ませておく。
 
 ### 1. 自分用のプライベートリポジトリを作る
@@ -193,7 +193,9 @@ git fetch upstream
 git merge upstream/main --allow-unrelated-histories   # 2回目からは --allow-unrelated-histories は不要
 ```
 
-upstreamを足すとremoteが2つになるので、`gh`のコマンドには必ず`-R MY-NAME/x-bookmark-digest`を付ける。
+Claude Code では `/sync-fork` で、競合の解き方と `make check`、push までをまとめて行える。
+
+upstreamを足すとremoteが2つになるので、`gh`のコマンドには必ず`-R MY-NAME/x-bookmark-digest`を付ける（Claude Code では、付け忘れをフックが止める）。
 
 `data/`、`state/`、`config/report.json`、`config/enabled.json`は、自分のリポジトリの値を残す。
 

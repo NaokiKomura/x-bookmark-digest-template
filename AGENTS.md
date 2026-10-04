@@ -28,52 +28,9 @@ Codex は `config/report.json` の `artifact_url` を使わない。
 
 ## 初回セットアップ（情報源・取得ワークフロー・ルーチン）
 
-`config/enabled.json` がないときは、ほかの作業の前に次の3つを利用者に尋ねる。どれも利用者が決めることなので、
-エージェントが勝手に選んだり、外部の設定（Actions の有効化、ルーチンの作成、push）を先に進めたりしない。
-
-| 設問 | 形式 | 選択肢 |
-| --- | --- | --- |
-| 集めるトレンド | 複数選択 | `configure_sources --list` の `trends` グループ |
-| 集める公式テックブログ | 複数選択 | 同じく `blogs` グループ（企業単位） |
-| 取得ワークフロー（GitHub Actions、毎朝3:17） | 1つ選ぶ | 有効にして今すぐ1回試す／有効にするだけ（翌朝3:17から）／あとで自分で設定する |
-| 要約のルーチン（Claude、毎朝7:00） | 1つ選ぶ | 今作る（毎日7:00）／あとで自分で作る（「その他」で時刻を指定できる） |
-
-Claude Code では AskUserQuestion の1回の呼び出しにこの4問を入れる（情報源の2問は `multiSelect: true`。1問4択まで。
-選択肢が5つ以上のグループは2問に分け、その分 Actions・ルーチンの設問は次の呼び出しに回す）。
-ほかのエージェントでは、番号付きの一覧を示して番号で答えてもらう。X のブックマークは常に集めるので尋ねない。
-
-### 1. 情報源
-
-1. `uv run python -m scripts.configure_sources --list` で選択肢を出す（グループごとの `id`・`label`・`note`）。選択肢には `label`、説明には `note` を使う。
-2. 選ばれた `id` をカンマ区切りで `uv run python -m scripts.configure_sources --enable <ids>` に渡す（何も選ばれなければ `--enable ""`）。
-3. `make check` を通し、`config/enabled.json` をコミットする。選ばれなかった情報源には取得層が接続しない。
-
-### 2. 取得ワークフロー（「あとで」なら何もしない）
-
-1. 有効にする前に `config/enabled.json` を push する（push してよいか確認する。push しないと、ワークフローはすべての情報源を集める）。
-2. 必要な Secrets がそろっているか、名前だけを確かめる：`gh secret list -R <自分のリポジトリ>`。
-   必要なのは `X_CLIENT_ID`、`X_CLIENT_SECRET`、`X_USER_ID`、`X_REFRESH_TOKEN`、`GH_PAT`。
-   足りなければ有効にせず、足りない名前と README のセットアップ手順2・3を示して止まる（値は利用者が登録する。エージェントは秘密情報を扱わない）。
-   `TYPESAFE_API_KEY` は任意。なければ止まらずに進め、「Jev を使わず、判定と分類はルーチンが行う（README の「Jevを使わない場合」）。使うならキーを登録すれば翌朝から反映される」と伝える。
-3. `gh variable set DIGEST_ENABLED --body true -R <自分のリポジトリ>`。
-   定期実行は既定の毎日3:17のまま使うことを勧める（毎時0分は混み合って数時間遅れることがあるため。README の手順5）。
-   利用者が時刻を変えたいと言ったら、毎時0分を避け、ルーチンの時刻より3時間以上前にするよう伝える。
-4. 「今すぐ試す」なら `gh workflow run fetch -R <自分のリポジトリ>` を実行し、`gh run watch` で終わりを待って結果を伝え、`git pull` で `data/` に当日のファイルが入ったことを確かめる。
-
-`gh` には必ず `-R` を付ける（remote が2つあるとテンプレートを操作してしまうことがある）。
-
-### 3. 要約のルーチン（「あとで」なら何もしない）
-
-Codex で作業する場合、要約の実行先は Codex Cloud として [CODEX.md](CODEX.md) を案内する。
-以下の Claude 用設定でルーチンを作らない。Cloud の定期起動を設定できない場合は、その未設定項目を報告する。
-
-- Claude Code では schedule スキル（`/schedule`）でルーチンを作る。設定は README のセットアップ手順6の表のとおり（毎日7:00、モデル Sonnet、コネクタなし、プロンプトは表の文面）。
-  利用者が時刻を指定したらその時刻にする。取得ワークフローは3:17に始まり数分かかる（数時間遅れることもある）ので、5:30より前を指定されたら、その旨を伝えて確かめる。
-- ルーチンを作れないエージェントでは作らず、README の手順6を示して、claude.ai/code/routines で作ってもらう。
-- 作ったら「今すぐ実行」で1回試すかを尋ねる。
-
-最後に、選ばれた内容と、「あとで」にした項目の残りの手順（README の該当箇所）を短くまとめて伝える。
-選び直したいと言われたときも同じ手順で行う（情報源だけ、ワークフローだけ、と一部だけでもよい）。
+`config/enabled.json` がないときは、ほかの作業の前に [docs/setup.md](docs/setup.md) の手順で、
+集める情報源・取得ワークフロー・要約のルーチンを利用者に尋ねる（Claude Code では `/setup` でも始められる）。
+どれも利用者が決めることなので、エージェントが勝手に選んだり、外部の設定（Actions の有効化、ルーチンの作成、push）を先に進めたりしない。
 
 ## コマンド
 
@@ -83,6 +40,8 @@ make check       # lint + 型 + テスト + テンプレートの検証。変更
 make fmt         # 整形と自動修正
 make try         # 実際のサイトから取得して /tmp/x-bookmark-digest-try に出す（X は呼ばない）
 make preview     # サンプルデータ入りのレポートをブラウザで開く
+make shots       # テンプレートの見た目をヘッドレス Chrome で撮る（幅3種・ダーク。/tmp/x-bookmark-digest-shots）
+make icons       # template/icons/ のロゴをテンプレートに埋め込み直す
 uv run pytest tests/test_parsers.py -k devio     # テストを絞る
 ```
 
@@ -91,7 +50,7 @@ uv run pytest tests/test_parsers.py -k devio     # テストを絞る
 | やりたいこと | 触るファイル | 手順 |
 | --- | --- | --- |
 | サイトのページ構造が変わって「取得失敗」になった | `config/sources.json` のセレクタ、`scripts/lib/parsers.py`、`tests/fixtures/sources/` | [recipes](docs/recipes.md#ページ構造が変わった) |
-| 集める情報源を選び直す | `uv run python -m scripts.configure_sources --enable ...`（`config/enabled.json`） | [初回セットアップ](#初回セットアップ情報源取得ワークフロールーチン) |
+| 集める情報源を選び直す | `uv run python -m scripts.configure_sources --enable ...`（`config/enabled.json`） | [docs/setup.md](docs/setup.md) |
 | 公式ブログや情報源を足す・外す | `config/sources.json`（ブログはここだけで済む） | [recipes](docs/recipes.md#公式ブログを足す) |
 | Jev の問い・しきい値を変える | `config/jev.json` | [recipes](docs/recipes.md#jev-の問いやしきい値を変える) |
 | トピックを変える | `config/topics.json` と `template/report.html` の `TOPICS` | [recipes](docs/recipes.md#トピックを変える) |
@@ -100,6 +59,7 @@ uv run pytest tests/test_parsers.py -k devio     # テストを絞る
 | data/ のファイルの形を変える | `scripts/lib/models.py`、`docs/data.md`、書く側と読む側のスクリプト、`ROUTINE.md` | [docs/data.md](docs/data.md) |
 | 要約の書き方を変える | `ROUTINE.md` | ― |
 | X API の取得を変える | `scripts/fetch_bookmarks.py`、`scripts/lib/x_oauth.py` | ― |
+| テンプレートの更新を自分のリポジトリに取り込む | ―（Claude Code では `/sync-fork`） | [README](README.md#テンプレートの更新を取り込む) |
 
 ## ディレクトリ
 
@@ -119,6 +79,7 @@ template/report.html     レポートのテンプレート（サンプルデー�
 tests/                   テスト。tests/fixtures/ にサイトのスナップショット
 docs/                    architecture / data / conventions / recipes / spec（元の仕様書）
 ROUTINE.md               ルーチンのプロンプト本体
+.claude/                 Claude Code の設定（settings.json の権限、hooks/guard.py、skills/ の /setup・/sync-fork）
 ```
 
 ## 守ること
@@ -133,5 +94,7 @@ ROUTINE.md               ルーチンのプロンプト本体
 8. **これは公開テンプレート。** 個人のデータ、URL、ID を入れない（`config/report.json` の `artifact_url` は空のまま）。
 9. **小さく変える。** 1回の変更は1つの目的にする。大きな変更は先に手順を箇条書きにして見せる。
 10. **外部への呼び出し回数や費用が変わる変更**は、README の「費用の試算」と「1日あたりの外部への呼び出し」を更新する。振る舞いを変えたら仕様書（docs/spec.md）も同じ変更で直す。
+
+1・3・4・11（ROUTINE.md）の一部は、指示だけでなくテストとフック（`.claude/hooks/guard.py`）でも止めている。フックに止められたら、回避せずに理由を読んで直す。
 
 命名とコードの書き方は [docs/conventions.md](docs/conventions.md)。
