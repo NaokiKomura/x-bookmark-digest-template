@@ -28,7 +28,8 @@ Codex は `config/report.json` の `artifact_url` を使わない。
 
 ## 初回セットアップ（情報源・取得ワークフロー・ルーチン）
 
-`config/enabled.json` がないときは、ほかの作業の前に [docs/setup.md](docs/setup.md) の手順で、
+公開テンプレート自体の開発・レビューでは運用設定を作らない。利用者用のリポジトリで運用設定を依頼され、
+`config/enabled.json` がないときは、ほかの設定作業の前に [docs/setup.md](docs/setup.md) の手順で、
 集める情報源・取得ワークフロー・要約のルーチンを利用者に尋ねる（Claude Code では `/setup` でも始められる）。
 どれも利用者が決めることなので、エージェントが勝手に選んだり、外部の設定（Actions の有効化、ルーチンの作成、push）を先に進めたりしない。
 

@@ -2,7 +2,7 @@
 
 ## Claude Code 向けの補足
 
-- `config/enabled.json` がなければ、最初に [docs/setup.md](docs/setup.md) を読んで初回セットアップを行う（利用者は `/setup` でも始められる）。テンプレートの更新の取り込みは `/sync-fork`。
+- 利用者用のリポジトリで運用設定を依頼され、`config/enabled.json` がなければ、最初に [docs/setup.md](docs/setup.md) を読んで初回セットアップを行う（利用者は `/setup` でも始められる）。テンプレートの更新の取り込みは `/sync-fork`。
 
 - Jev（`config/jev.json`、`scripts/classify_jev.py`）を変えるときは TypeSafe のスキル（`/typesafe:typesafe-ai`）を使い、公式ドキュメント（https://docs.typesafe.ai/llms.txt）を正とする。問いは英語で書き、`make try` に `TYPESAFE_API_KEY` を渡して実データで判定を確かめてから採用する。
 - テンプレートの見た目を変えたら、`make shots` で幅3種とダークモードを撮って確かめる（`make preview` はブラウザーで開く）。ロゴを足したら `make icons`。ルーチンが使うアーティファクトはルーチンが公開し直すので、ここから公開しない。
