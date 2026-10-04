@@ -7,7 +7,7 @@
 | 取得層 | GitHub Actions（`.github/workflows/fetch.yml`、3:17 JST） | X API、各サイト、GitHub API、TypeSafe AI（キーがあるときだけ） | X・TypeSafe・GH_PAT（Secrets） | main の `data/`、`state/` |
 | 要約層 | Claude Code のルーチン、または Codex Cloud（7:00 JST を想定） | 外部サイトなし。Claude は Git（`claude/reports` への push）と Artifact だけ | なし | Claude: 固定アーティファクトと `claude/reports`。Codex: 結果チャット |
 | 履歴の保存（Codex） | 要約とは別の信頼した環境（PUBLISH.md） | Git のみ | `codex/reports` への書き込み | `codex/reports` |
-| 表示層 | Claude のアーティファクト、または Codex の結果チャット・HTMLファイル | cdnjs の d3 の取得 | なし | 閲覧者のブラウザの localStorage（既読・あとで読む） |
+| 表示層 | Claude のアーティファクト、または Codex の結果チャット・HTMLファイル | cdnjs の d3 の取得 | なし | アーティファクトの db（所有者だけが読み書き。既読・あとで読む）。db がない場面は閲覧者のブラウザの localStorage |
 
 この分け方の理由: 外部の文章（記事本文など）には Claude への指示が紛れ込みうる。要約層からコネクタと秘密情報を外すことで、操作可能な範囲を狭める。
 記事の取得を取得層で済ませておくので、ルーチンはネットワーク設定を初期状態のまま使える。
@@ -58,7 +58,10 @@ Claude の `artifact_url` は使わない。Codex の履歴は別の担当者が
 
 `template/report.html` は1ファイルで完結する。画像は企業と情報源（GitHub・Qiita・Zenn・DevelopersIO）のロゴだけで、元画像を `template/icons/` に置き、テンプレートには data URI で埋め込んでいる（外部から読み込まない）。話題マップには cdnjs の d3 を使い、取得できない場合は話題名と件数のボタンを表示する。フォントは外部から読み込まず、システムフォントを使う。
 `<script type="application/json" id="report-data">` の中身だけが日々変わり、ほかの部分は変えない。
-話題マップ（d3 の treemap）、絞り込み、既読・あとで読む（localStorage）、図解はすべてこの JSON から描く。
+話題マップ（d3 の treemap）、絞り込み、既読・あとで読む、図解はすべてこの JSON から描く。
+既読・あとで読むは、claude.ai のアーティファクトを所有者が開いたときだけ、アーティファクトの db（`read/<掲載日>`、`later/<項目ID>`）に保存して端末間で同期する。
+db は claude.ai が提供する保存先で、外部への接続ではない。ルーチンが公開するときに、読み書きを所有者だけに絞る rules を宣言する。
+db が使えない場面（手元のファイル、Codex の HTML、所有者以外の閲覧）は localStorage にだけ保存する。
 
 ## 設計上の判断
 

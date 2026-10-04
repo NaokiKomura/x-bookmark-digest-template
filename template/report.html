@@ -1199,7 +1199,10 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   }
   function readButton(p){
     var rb = el('button', {'class': 'readbtn', 'type': 'button', 'aria-pressed': 'false'}, '既読にする');
-    rb.addEventListener('click', function(){ if (read[p.id]) delete read[p.id]; else read[p.id] = 1; saveRead(); apply(); renderMap(); });
+    rb.addEventListener('click', function(){
+      var on = !read[p.id]; if (on) read[p.id] = 1; else delete read[p.id];
+      saveRead(); syncRead(p.id, on, itemDate(p)); apply(); renderMap();
+    });
     return rb;
   }
   function saveButton(p){
@@ -1210,7 +1213,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
         var copy = {}; Object.keys(p).forEach(function(k){ if (k.charAt(0) !== '_') copy[k] = p[k]; });
         later[p.id] = {source: p._src, date: p._carried || p._savedDate || D.date, item: copy};
       }
-      saveStore(LATER_KEY, later); apply();
+      saveStore(LATER_KEY, later); syncLater(p.id); apply();
     });
     return b;
   }
@@ -1458,24 +1461,36 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     box._list = list; box._key = 'co'; groups.push(box); carryWrap.appendChild(box);
   });
   document.getElementById('n-carry').textContent = carried.length + '件';
-  // 保存した記事は日報の繰り越し期間を過ぎてもローカルに残す。今日・繰り越しと重複させない。
-  var retained = [], savedBox = document.getElementById('saved-items');
-  Object.keys(later).forEach(function(id){
-    var entry = later[id], p = entry && entry.item;
-    if (seenIds[id] || !p || p.id !== id || typeof p.title !== 'string' || !tName[p.theme] || !SRC[entry.source]) return;
-    if (entry.source === 'bookmarks' && !Array.isArray(p.points)) return;
-    if (entry.source === 'blogs' && !Array.isArray(p.points)) return;
+  // 保存した記事は日報の繰り越し期間を過ぎても残す。今日・繰り越しと重複させない。
+  // ほかの端末で保存したものが同期で届いたら、addRetained で後から足す
+  var retained = [], savedBox = document.getElementById('saved-items'), savedGroups = {};
+  function toRetained(id, entry){
+    var p = entry && entry.item;
+    if (seenIds[id] || byId[id] || !p || p.id !== id || typeof p.title !== 'string' || !tName[p.theme] || !SRC[entry.source]) return null;
+    if ((entry.source === 'bookmarks' || entry.source === 'blogs') && !Array.isArray(p.points)) return null;
     p._src = entry.source; p._savedOnly = true; p._savedDate = entry.date;
-    retained.push(p); byId[id] = p;
-  });
-  SRC_ORDER.forEach(function(src){
-    var list = retained.filter(function(p){ return p._src === src; }); if (!list.length) return;
+    return p;
+  }
+  function savedGroup(src){
+    if (savedGroups[src]) return savedGroups[src];
     var group = el('div', {'class': 'carry-group'}); group.appendChild(el('h3', null, SRC[src]));
-    var holder = src === 'github' ? el('ol', {'class': 'gh'}) : ['qiita', 'zenn', 'devio'].indexOf(src) >= 0 ? el('ol', {'class': 'col'}) : el('div');
-    list.forEach(function(p){ holder.appendChild(src === 'bookmarks' ? renderPost(p) : src === 'blogs' ? renderBlog(p) : src === 'github' ? renderRepo(p) : renderArticle(p)); });
-    group.appendChild(holder); group._list = list; group._key = 'saved'; groups.push(group); savedBox.appendChild(group);
-  });
+    group._holder = src === 'github' ? el('ol', {'class': 'gh'}) : ['qiita', 'zenn', 'devio'].indexOf(src) >= 0 ? el('ol', {'class': 'col'}) : el('div');
+    group.appendChild(group._holder); group._list = []; group._key = 'saved'; groups.push(group);
+    var next = SRC_ORDER.slice(SRC_ORDER.indexOf(src) + 1).map(function(s){ return savedGroups[s]; }).filter(Boolean)[0];
+    savedBox.insertBefore(group, next || null);
+    return (savedGroups[src] = group);
+  }
+  function renderSaved(p){
+    var g = savedGroup(p._src), src = p._src;
+    g._holder.appendChild(src === 'bookmarks' ? renderPost(p) : src === 'blogs' ? renderBlog(p) : src === 'github' ? renderRepo(p) : renderArticle(p));
+    g._list.push(p); retained.push(p); byId[p.id] = p;
+  }
+  Object.keys(later).forEach(function(id){ var p = toRetained(id, later[id]); if (p) renderSaved(p); });
   var allItems = items.concat(carried, retained);
+  function addRetained(id, entry){
+    var p = toRetained(id, entry); if (!p) return;
+    renderSaved(p); p._text = itemText(p); allItems.push(p);
+  }
 
   // ---------- 過去の日報（索引） ----------
   // ルーチンが前日から14日前までのレポートの見出しを archive に入れる。今日・繰り越し・保存と重なるものは出さない
@@ -1666,11 +1681,12 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   // ---------- キーワード検索 ----------
   // 見出し・要点・キーワード・概要・投稿者・記事名・引用元を対象に、空白で区切ったすべての語を含む項目を出す
   var qInput = document.getElementById('q'), qCount = document.getElementById('q-n'), qTimer;
-  allItems.forEach(function(p){
-    p._text = [p.title, p.summary, p.author, p.handle, p.company_label, p.blog, SRC[p._src], tName[p.theme],
+  function itemText(p){
+    return [p.title, p.summary, p.author, p.handle, p.company_label, p.blog, SRC[p._src], tName[p.theme],
       (p.points || []).join(' '), (p.keywords || []).join(' '), p.article && p.article.title, p.quoted && p.quoted.claim]
       .filter(Boolean).join(' ').toLowerCase();
-  });
+  }
+  allItems.forEach(function(p){ p._text = itemText(p); });
   function terms(){ return state.query.toLowerCase().split(/\s+/).filter(Boolean); }
   function matchesQuery(p){ return terms().every(function(t){ return p._text.indexOf(t) >= 0; }); }
   function runSearch(){
@@ -1822,9 +1838,93 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   }
   placeAside();
 
+  var genText = '';
   if (D.generated_at) {
     var gd = new Date(D.generated_at);
-    if (!isNaN(gd)) document.getElementById('footer').textContent = (gd.getMonth()+1) + '月' + gd.getDate() + '日 ' + gd.getHours() + ':' + String(gd.getMinutes()).padStart(2,'0') + ' に生成。既読・あとで読むの記録はこのブラウザーにだけ保存されます。';
+    if (!isNaN(gd)) genText = (gd.getMonth()+1) + '月' + gd.getDate() + '日 ' + gd.getHours() + ':' + String(gd.getMinutes()).padStart(2,'0') + ' に生成。';
+  }
+
+  // ---------- アカウントへの保存と端末間の同期 ----------
+  // claude.ai のアーティファクトとして開いたときだけ db に保存し、ほかの端末と同期する。
+  // read/<掲載日> = {ids: {項目ID: 1}}（掲載日ごとにまとめて文書の数を抑える）、later/<項目ID> = {source, date, item}。
+  // 読み書きは所有者だけ（ルーチンが公開するときの db の rules）。db がない場面（手元のファイル、Codex）と
+  // 所有者以外が開いた場面は、このブラウザーにだけ保存する
+  var remoteDb = null, remoteRead = null, remoteLater = null, writeQueues = {};
+  function itemDate(p){ return p._carried || p._savedDate || D.date; }
+  function showSyncState(on){
+    var text = on ? '既読・あとで読むは、アカウントに保存してほかの端末と同期します。' : '既読・あとで読むは、このブラウザーに保存されます。';
+    document.querySelector('.storage-note').textContent = text;
+    document.getElementById('footer').textContent = genText + text;
+  }
+  function syncFailed(e){
+    // 一時的な失敗は次の操作で書き直される（文書ごとに今の状態を丸ごと書くため）。それ以外は同期をやめる
+    var code = e && e.code;
+    if (code === 'unavailable' || code === 'resource_exhausted') return;
+    remoteDb = null; showSyncState(false);
+  }
+  // 同じ文書への書き込みは1つずつ順に行う。書く内容は実行するときの状態から作る（null なら消す）
+  function writeDoc(path, makeBody){
+    if (!remoteDb) return;
+    writeQueues[path] = (writeQueues[path] || Promise.resolve()).then(function(){
+      if (!remoteDb) return;
+      var body = makeBody(), ref = remoteDb.doc(path);
+      return body ? ref.set(body) : ref.delete();
+    }).catch(syncFailed);
+  }
+  function syncRead(id, on, date){
+    if (!remoteDb || !remoteRead) return;
+    var dates = on ? [date] : Object.keys(remoteRead).filter(function(d){ return remoteRead[d][id]; });
+    dates.forEach(function(d){
+      var ids = Object.assign({}, remoteRead[d] || {});
+      if (on) ids[id] = 1; else delete ids[id];
+      remoteRead[d] = ids;
+      writeDoc('read/' + d, function(){ var cur = remoteRead[d] || {}; return Object.keys(cur).length ? {ids: cur} : null; });
+    });
+  }
+  function syncLater(id){
+    if (!remoteDb || !remoteLater) return;
+    writeDoc('later/' + id, function(){ var e = later[id]; return e ? {source: e.source, date: e.date, item: e.item} : null; });
+  }
+  function startSync(db){
+    remoteDb = db;
+    db.collection('read').onSnapshot(function(snap){
+      var next = {}, merged = {}, first = remoteRead === null;
+      snap.docs.forEach(function(doc){ var b = doc.data(); if (b && b.ids && typeof b.ids === 'object') next[doc.id] = Object.assign({}, b.ids); });
+      remoteRead = next;
+      Object.keys(next).forEach(function(d){ Object.keys(next[d]).forEach(function(id){ merged[id] = 1; }); });
+      if (first) {
+        // この端末だけで既読にしていた、このページの項目をアカウントに移す
+        var up = Object.keys(read).filter(function(id){ return !merged[id] && byId[id]; });
+        up.forEach(function(id){ merged[id] = 1; });
+        setTimeout(function(){ up.forEach(function(id){ syncRead(id, true, itemDate(byId[id])); }); }, 0);
+      }
+      read = merged; saveRead(); apply(); renderMap(); showSyncState(!!remoteDb);
+    }, syncFailed);
+    db.collection('later').onSnapshot(function(snap){
+      var next = {}, first = remoteLater === null;
+      snap.docs.forEach(function(doc){
+        var b = doc.data();
+        if (b && b.item && SRC[b.source]) next[doc.id] = {source: b.source, date: b.date, item: JSON.parse(JSON.stringify(b.item))};
+      });
+      remoteLater = next;
+      if (first) {
+        var up = Object.keys(later).filter(function(id){ return !next[id]; });
+        up.forEach(function(id){ next[id] = later[id]; });
+        setTimeout(function(){ up.forEach(syncLater); }, 0);
+      }
+      later = next;
+      Object.keys(later).forEach(function(id){ addRetained(id, later[id]); });
+      saveStore(LATER_KEY, later); apply();
+    }, syncFailed);
+  }
+  showSyncState(false);
+  // 所有者でなければ db は空に見えるので、同期を始めない（この端末の記録を空で上書きしないため）
+  if (window.claude && typeof window.claude.use === 'function') {
+    Promise.all([window.claude.use('db'), window.claude.use('user')]).then(function(r){
+      var db = r[0], user = r[1];
+      if (!db || !user) return;
+      return user.isOwner().then(function(owner){ if (owner) startSync(db); });
+    }).catch(function(){});
   }
 
   renderMap(); apply(); startWatching();
