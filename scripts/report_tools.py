@@ -5,7 +5,7 @@ scripts/lib を import しない（ルーチンは python3 scripts/report_tools.
 python3 scripts/report_tools.py inputs  YYYY-MM-DD            当日の入力の有無と件数、要約が要る項目の一覧
 python3 scripts/report_tools.py trend   YYYY-MM-DD            直近14日のブックマーク件数（report-data の trend）
 python3 scripts/report_tools.py keywords [--reports DIR]      直近のレポートで使ったキーワードの一覧（表記の統一用）
-python3 scripts/report_tools.py build   DATA.json OUT.html    テンプレートの report-data だけを差し替える
+python3 scripts/report_tools.py build   DATA.json OUT.html    保存済み入力で表示情報を補い、JSONとHTMLを保存
 python3 scripts/report_tools.py validate OUT.html             差し替えたHTMLを検証する（公開の前に必ず通す）
 python3 scripts/report_tools.py carryover YYYY-MM-DD [--reports DIR]  前日から3日前までのレポートの項目（report-data の carryover）
 python3 scripts/report_tools.py archive YYYY-MM-DD [--reports DIR]    前日から14日前までのレポートの索引（report-data の archive）
@@ -15,6 +15,7 @@ python3 scripts/report_tools.py save-summaries YYYY-MM-DD IN_DIR CHECKOUT  検�
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import math
 import re
@@ -22,6 +23,7 @@ import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = ROOT / "template" / "report.html"
@@ -149,7 +151,7 @@ def item_errors(section: str, item: Any) -> list[str]:
         **{key: [] for key in CARRY_SECTIONS},
     }
     report[section] = [item]
-    return validate_data(report)
+    return validate_data(report, check_related=False)
 
 
 def cmd_carryover(day: str, reports_dir: Path) -> list[dict[str, Any]]:
@@ -305,16 +307,100 @@ def embed(data: Any) -> str:
     )
 
 
+def article_url(url: str) -> str:
+    """取得層と同じ計測パラメータだけを除く。意味のあるクエリは残す。"""
+    parts = urlsplit(url.strip())
+    query = [
+        (k, v)
+        for k, v in parse_qsl(parts.query, keep_blank_values=True)
+        if not k.lower().startswith("utm_")
+        and k.lower() not in {"ref", "ref_src", "fbclid", "gclid"}
+    ]
+    return urlunsplit(
+        (parts.scheme.lower(), parts.netloc.lower(), parts.path, urlencode(query), "")
+    )
+
+
+def enrich_data(data: dict[str, Any]) -> None:
+    """保存済み入力だけから表示用の事実を補う。本文や数値の変化を推測しない。"""
+    day = data["date"]
+    sources = read(ROOT / "data" / "sources" / f"{day}.json") or {}
+    yesterday = (date.fromisoformat(day) - timedelta(days=1)).isoformat()
+    previous = read(ROOT / "data" / "sources" / f"{yesterday}.json") or {}
+    bookmarks = read(ROOT / "data" / f"{day}.json") or {}
+    originals = {p["id"]: p for p in bookmarks.get("posts", [])}
+    trends = data["github"] + data["articles"]
+    for section in CARRY_SECTIONS:
+        for item in data[section]:
+            record = None
+            key = item["id"]
+            if section == "posts":
+                url = (item.get("article") or {}).get("url")
+                key = hashlib.sha256(article_url(url).encode()).hexdigest()[:12] if url else ""
+            if re.fullmatch(r"[0-9a-f]{12}", key):
+                record = read(ROOT / "data" / "articles" / f"{key}.json")
+            if record:
+                item["fetch_status"] = record["fetch_status"]
+                if section == "posts" and item.get("article"):
+                    item["article"]["fetch_status"] = record["fetch_status"]
+                if record["fetch_status"] in {"ok", "partial"}:
+                    # partial は取得した本文だけの時間。原文全体とは区別して表示する。
+                    chars = (
+                        len(record.get("text", ""))
+                        if record["fetch_status"] == "partial"
+                        else record.get("chars", 0)
+                    )
+                    item["read_min"] = min(MAX_READ_MIN, max(1, math.ceil(chars / 500)))
+                elif section in {"github", "articles"}:
+                    item.pop("read_min", None)
+            else:
+                item["fetch_status"] = (
+                    (item.get("article") or {}).get("fetch_status", "ok")
+                    if section == "posts"
+                    else item.get("fetch_status", "error")
+                )
+            item["related_ids"] = []
+            item.pop("changes", None)
+    for post in data["posts"]:
+        urls = {article_url(link["url"]) for link in originals.get(post["id"], {}).get("links", [])}
+        if (post.get("article") or {}).get("url"):
+            urls.add(article_url(post["article"]["url"]))
+        for item in trends:
+            if item.get("url") and article_url(item["url"]) in urls:
+                post["related_ids"].append(item["id"])
+                item["related_ids"].append(post["id"])
+    if sources.get("date") != day or previous.get("date") != yesterday:
+        return
+    for item in trends:
+        source = "github" if item in data["github"] else item["site"]
+        current = next((p for p in sources.get(source, []) if p["article_key"] == item["id"]), None)
+        before = next((p for p in previous.get(source, []) if p["article_key"] == item["id"]), None)
+        if not current or not before:
+            continue
+        changes = {}
+        for key in ("rank", "stars_today", "stars_total", "likes"):
+            a, b = before.get(key), current.get(key)
+            if is_number(a) and is_number(b):
+                changes[key] = {"before": a, "after": b}
+        if changes:
+            item["changes"] = changes
+
+
 def cmd_build(data_path: Path, out_path: Path) -> None:
     data = json.loads(data_path.read_text(encoding="utf-8"))
     errors = validate_data(data)
     if errors:
         raise SystemExit("report-data の検証に失敗: " + "; ".join(errors))
+    enrich_data(data)
+    errors = validate_data(data)
+    if errors:
+        raise SystemExit("表示情報の検証に失敗: " + "; ".join(errors))
     template = TEMPLATE.read_text(encoding="utf-8")
     if not BLOCK.search(template):
         raise SystemExit("template has no report-data block")
     html = BLOCK.sub(lambda m: m.group(1) + embed(data) + m.group(3), template, count=1)
     out_path.write_text(html, encoding="utf-8")
+    data_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def outside_block(html: str) -> str:
@@ -385,15 +471,15 @@ def is_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def validate_data(data: Any) -> list[str]:
+def validate_data(data: Any, *, check_related: bool = True) -> list[str]:
     """不正なJSONも例外にせず、問題の一覧を返す。"""
     try:
-        return validate_report(data)
+        return validate_report(data, check_related=check_related)
     except (TypeError, ValueError, AttributeError, OverflowError):
         return ["report-data の項目の型が不正"]
 
 
-def validate_report(data: Any) -> list[str]:
+def validate_report(data: Any, *, check_related: bool = True) -> list[str]:
     """report-data の形を確かめる。問題の一覧を返す（空なら合格）。"""
     errors: list[str] = []
     if not isinstance(data, dict):
@@ -593,6 +679,32 @@ def validate_report(data: Any) -> list[str]:
                     isinstance(item[k], list) and all(is_text(text) for text in item[k]),
                     f"{section} {iid}: {k} は文字列の配列",
                 )
+        if "fetch_status" in item:
+            need(item["fetch_status"] in FETCH_STATUSES, f"{section} {iid}: fetch_status が不明")
+        if "read_min" in item:
+            need(
+                is_number(item["read_min"]) and 1 <= item["read_min"] <= MAX_READ_MIN,
+                f"{section} {iid}: read_min は1〜{MAX_READ_MIN}",
+            )
+        related = item.get("related_ids", [])
+        need(
+            isinstance(related, list)
+            and all(is_text(r) and r != iid for r in related)
+            and len(set(related)) == len(related),
+            f"{section} {iid}: related_ids が不正",
+        )
+        changes = item.get("changes", {})
+        need(
+            isinstance(changes, dict)
+            and all(
+                k in {"rank", "stars_today", "stars_total", "likes"}
+                and isinstance(v, dict)
+                and is_number(v.get("before"))
+                and is_number(v.get("after"))
+                for k, v in changes.items()
+            ),
+            f"{section} {iid}: changes が不正",
+        )
 
     for p in data["posts"]:
         check_item("posts", p)
@@ -643,6 +755,21 @@ def validate_report(data: Any) -> list[str]:
         need(s.get("source") in SOURCE_NAMES, f"source_status: source が不明: {s.get('source')}")
     for x in data["excluded"]:
         need(x.get("source") in EXCLUDED_SOURCES, f"excluded: source が不明: {x.get('source')}")
+        need(is_text(x.get("title")), "excluded: title がない")
+        need(
+            is_text(x.get("url")) and x["url"].startswith("https://"),
+            "excluded: url が https でない",
+        )
+        need(
+            x.get("tech_prob") is None or (is_number(x["tech_prob"]) and 0 <= x["tech_prob"] <= 1),
+            "excluded: tech_prob は0〜1またはnull",
+        )
+    for section in CARRY_SECTIONS:
+        for item in data[section]:
+            need(
+                not check_related or all(r in ids for r in item.get("related_ids", [])),
+                f"{section}: related_ids の参照先がない",
+            )
     for pid in data["picks"]:
         need(pid in ids, f"picks に存在しない項目: {pid}")
     need(len(set(data["picks"])) == len(data["picks"]), "picks のIDが重複")
@@ -655,6 +782,12 @@ def validate_report(data: Any) -> list[str]:
             for key, value in reasons.items()
         ),
         "pick_reasons は picks のIDをキーとする空でない文字列のオブジェクト",
+    )
+    audiences = data.get("pick_audiences", {})
+    need(
+        isinstance(audiences, dict)
+        and all(key in data["picks"] and is_text(value) for key, value in audiences.items()),
+        "pick_audiences は picks のIDをキーとする空でない文字列のオブジェクト",
     )
     errors += validate_carryover(data.get("carryover", []), str(data["date"]))
     errors += validate_archive(data.get("archive", []), str(data["date"]))

@@ -47,7 +47,7 @@ claude.ai のルーチンには、要約と公開を別の環境に分ける仕�
 
 1. `report_tools.py inputs` で当日の入力の有無と件数を確かめる
 2. `data/` を資料として読み、要約して report-data の JSON を作る
-3. `report_tools.py build` でテンプレートの report-data ブロックだけを差し替え、`validate` で検証する
+3. `report_tools.py build` で保存済み入力から取得状態・関連記事・前日の数値差分を補い（入力JSONにも書き戻す）、テンプレートの report-data ブロックだけを差し替え、`validate` で検証する
 4. Claude は `config/report.json` の `artifact_url` に公開し、`reports/YYYY-MM-DD.html` と新しい要約を `claude/reports` に push する
 
 実行者は信頼したタスク設定で選ぶ。Codex は [CODEX.md](../CODEX.md) を入口とし、

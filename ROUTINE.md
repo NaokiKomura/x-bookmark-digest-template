@@ -116,7 +116,8 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | section_summaries | `{"blogs", "trends"}`。公式ブログ全体、トレンド（GitHub・Qiita・Zenn・DevelopersIO）全体で、どんな話題が多かったかを1〜2文で。新着がない情報源は省いてよい |
 | themes | その日に登場したトピック。`{"id", "name", "summary"}`。id と name は `config/topics.json` のもの。summary は1文 |
 | picks | 「まず読む3件」の項目ID。全情報源から、重要度とほかの項目とのつながりで選ぶ（手順4.5の反応があれば、その傾向も踏まえる） |
-| pick_reasons | 任意のオブジェクト。`picks` のIDをキーに、今日その記事を読む理由を短い1文で書く。要約の繰り返しや根拠のない評価にしない。旧レポートでは省略できる |
+| pick_reasons | 新しいレポートでは全 `picks` に必須。`picks` のIDをキーに、今日その記事を読む理由を短い1文で書く。要約の繰り返しや根拠のない評価にしない。旧レポートでは省略できる |
+| pick_audiences | 新しいレポートでは全 `picks` に必須。IDをキーに、どの仕事・課題を持つ人向けかを短く書く。旧レポートでは省略できる（画面は「未設定」）。各推薦に対象読者・読む理由・所要時間が並ぶ |
 | trend | `python3 scripts/report_tools.py trend "$DAY"` の出力をそのまま使う |
 | posts | ブックマークの要約（下の表） |
 | blogs | 公式ブログの要約。`{"id": article_key, "company", "company_label", "blog", "theme", "title", "url", "points", "keywords", "importance", "read_min", "fetch_status", "visual"?}`。`fetch_status` は `data/articles/<article_key>.json` の値（`blocked`・`error` なら画面には見出しだけが出る）。`read_min` は原文を読む時間で、記事の `chars`（取れなければ `summary` の文字数）÷ 500 を切り上げ、最低1・最大15 |
@@ -124,7 +125,7 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | github | `{"id": article_key, "rank", "title", "url", "language", "stars_today", "stars_total", "theme", "streak_days", "summary", "keywords"?, "visual"?（上位3件のみ）}` |
 | articles | Qiita・Zenn・DevelopersIO。`{"id": article_key, "site": "qiita"/"zenn"/"devio", "rank", "title", "url", "theme", "likes", "streak_days", "summary", "keywords"?, "visual"?（各サイトの上位3件のみ）}` |
 | source_status | 情報源ごとの結果。`{"source": "bookmarks"/"blogs"/"github"/"qiita"/"zenn"/"devio", "label", "status": "ok"/"none"/"error", "count", "message"?, "note"?}`。GitHub の `notes.github` があれば `note` に入れる。`data/sources/$DAY.json` の `status` にない情報源（初回セットアップで外したもの）は入れない |
-| excluded | 除外した項目。`{"source": "bookmarks"/"qiita"/"zenn", "title", "tech_prob", "url"}`。`data/excluded/` の項目と、守ること4の規則で自分が除外した項目。画面には出さず、記録として残す（誤判定の確認用） |
+| excluded | 除外した項目。`{"source": "bookmarks"/"qiita"/"zenn", "title", "tech_prob", "url"}`。`data/excluded/` の項目と、守ること4の規則で自分が除外した項目。通常の一覧には含めず、「除外された項目」で見出し・情報源・判定確率・元記事へのリンクを表示する（誤判定の確認用） |
 | carryover | `python3 scripts/report_tools.py carryover "$DAY" --reports /tmp/reports/reports` の出力をそのまま使う（手順4で取り出した前日から3日前までのレポートの項目）。履歴がなければ空の配列になる。閲覧者が既読にしていないものだけを、テンプレートが「前日までの未読」に出す |
 | archive | `python3 scripts/report_tools.py archive "$DAY" --reports /tmp/reports/reports` の出力をそのまま使う（前日から14日前までのレポートの見出しの索引）。履歴がなければ空の配列になる。テンプレートが「過去の日報」と検索に出す |
 
@@ -146,13 +147,20 @@ python3 scripts/report_tools.py keywords --reports /tmp/reports/reports
 | quoted | 引用のとき。`{"author", "handle", "url", "claim"}`（claim は引用元の主張の1文要約） |
 | visual | 任意。図解（下の表） |
 
+ビルド時に `report_tools.py` が保存済み入力から次の表示情報を補い、入力の `/tmp/report-data.json` にも書き戻す（HTML と JSON は同じ内容になる）。外部へは接続しない。
+
+- 全項目の `fetch_status`（`ok`＝本文取得済み、`partial`＝一部取得、`blocked/error`＝概要のみ）。記事のない投稿は投稿本文を取得済みとする。GitHub・ランキング記事も `data/articles/<id>.json` で確認する。履歴の旧項目で情報がない記事は概要のみ。
+- GitHub・ランキング記事の `read_min` は取得本文から計算（最低1・最大15）。`partial` は取得できた部分の文字数だけを用い「取得部分」と表示する。概要のみや未設定は「原文の時間は不明」と表示する。投稿・ブログの時間も保存済み本文があれば再計算する。
+- `related_ids` は同じ記事がブックマークとトレンドに出た場合の相互のID配列。元投稿の全リンクも照合し、計測用クエリとフラグメントだけを除いてURLを比較する。項目を削除・重複排除はしない。
+- トレンドの `changes` は前日・当日の同じ情報源・同じ `article_key` の保存済み数値を比較した `{rank/stars_today/stars_total/likes: {before, after}}`。両日とも数値があるキーだけ載せる。前日データがない項目は前日比較なし。本文内容の変化は推測しない。概要に「昨日から変わった点」、各項目にも差分を表示する。
+
 `fetch_status` ごとの扱い:
 
 | fetch_status | 要約での扱い |
 | --- | --- |
 | ok | 記事の内容を踏まえて要約する |
-| partial | Xのカード情報（`links[].card_title`、`card_description`）も併用する。要点に「本文の一部のみ」と書かなくてよい（画面に印が出る） |
-| blocked / error | タイトルと概要だけで要約する（画面に「本文未取得」の印が出る） |
+| partial | Xのカード情報（`links[].card_title`、`card_description`）も併用する。要点に「一部取得」と書かなくてよい（画面に印が出る） |
+| blocked / error | タイトルと概要だけで要約する（画面に「概要のみ」の印が出る） |
 
 図解（`visual.type`）:
 

@@ -349,3 +349,113 @@ def test_saves_only_verified_summary_json(monkeypatch, tmp_path):
     saved = json.loads((reports / "summaries" / f"{key}.json").read_text())
     assert saved["summary"] == "説明" and "extra" not in saved
     assert len(list((reports / "summaries").iterdir())) == 1
+
+
+def test_enrich_saved_input_status_links_and_yesterday(tmp_path, monkeypatch):
+    from scripts.lib.urls import url_key
+
+    data = sample()
+    topics = rt.load_topics()
+    monkeypatch.setattr(rt, "load_topics", lambda: topics)
+    monkeypatch.setattr(rt, "ROOT", tmp_path)
+    root = tmp_path / "data"
+    (root / "articles").mkdir(parents=True)
+    (root / "sources").mkdir()
+    url = data["posts"][0]["article"]["url"]
+    key = url_key(url)
+    data["articles"][0].update(id=key, url=url + "?utm_source=test#section")
+    data["posts"][0]["article"]["url"] += "?ref=feed"
+    data["picks"] = ["s1", key]
+    data["pick_reasons"] = {"s1": "設計に使う", key: "詳細を確認する"}
+    data["pick_audiences"] = {"s1": "開発者", key: "運用担当"}
+    (root / "articles" / f"{key}.json").write_text(
+        json.dumps(
+            {
+                "fetch_status": "partial",
+                "chars": 9000,
+                "text": "文" * 501,
+            }
+        )
+    )
+    # 要約に使った主な1本以外のリンクも関連づける。
+    (root / f"{data['date']}.json").write_text(
+        json.dumps(
+            {
+                "posts": [
+                    {
+                        "id": "s2",
+                        "links": [{"url": url}],
+                    }
+                ]
+            }
+        )
+    )
+    for day, rank, likes in ((data["date"], 1, 40), ("2026-10-02", 3, 30)):
+        (root / "sources" / f"{day}.json").write_text(
+            json.dumps(
+                {
+                    "date": day,
+                    "qiita": [{"article_key": key, "rank": rank, "likes": likes}],
+                }
+            )
+        )
+    rt.enrich_data(data)
+    assert data["posts"][0]["fetch_status"] == "partial"
+    assert data["posts"][0]["read_min"] == 2
+    assert data["articles"][0]["read_min"] == 2
+    assert data["posts"][0]["related_ids"] == [key]
+    assert data["posts"][1]["related_ids"] == [key]
+    assert data["articles"][0]["related_ids"] == ["s1", "s2"]
+    assert data["articles"][0]["changes"] == {
+        "rank": {"before": 3, "after": 1},
+        "likes": {"before": 30, "after": 40},
+    }
+    assert "changes" not in data["articles"][1]
+    assert rt.validate_data(data) == []
+    # 繰り越しは参照先がなくても、項目自体を失わない。
+    assert rt.item_errors("articles", data["articles"][0]) == []
+    incoming, out = tmp_path / "report.json", tmp_path / "report.html"
+    incoming.write_text(json.dumps(data))
+    rt.cmd_build(incoming, out)
+    assert json.loads(incoming.read_text()) == rt.extract_data(out.read_text())
+
+
+def test_enrich_does_not_invent_missing_metrics_or_merge_distinct_urls(tmp_path, monkeypatch):
+    from scripts.lib.urls import clean_url
+
+    monkeypatch.setattr(rt, "ROOT", tmp_path)
+    data = sample()
+    data["posts"][0]["article"]["url"] = "https://example.com/a?page=1"
+    data["articles"][0]["url"] = "https://example.com/a?page=2"
+    for url in (
+        "https://EXAMPLE.com/a?utm_source=x&page=1#abc",
+        "https://example.com/a?ref=x&gclid=y",
+        "https://example.com/a?page=2",
+    ):
+        assert rt.article_url(url) == clean_url(url)
+    rt.enrich_data(data)
+    assert data["posts"][0]["related_ids"] == []
+    assert all("changes" not in p for p in data["github"] + data["articles"])
+    assert data["github"][1]["fetch_status"] == "error"
+
+
+def test_new_report_metadata_validation():
+    data = sample()
+    for audiences in ({"missing": "開発者"}, {"s1": " "}, {"s1": 1}, None):
+        data["pick_audiences"] = audiences
+        assert rt.validate_data(data)
+    data = sample()
+    for field, value in (
+        ("fetch_status", "unknown"),
+        ("read_min", 0),
+        ("related_ids", ["missing"]),
+        ("related_ids", ["s1"]),
+        ("changes", {"rank": {"before": True, "after": 1}}),
+    ):
+        bad = sample()
+        bad["posts"][0][field] = value
+        assert rt.validate_data(bad)
+    for field, value in (("url", "javascript:alert(1)"), ("title", ""), ("tech_prob", 2)):
+        bad = sample()
+        bad["excluded"][0][field] = value
+        assert rt.validate_data(bad)

@@ -217,6 +217,11 @@ body.leaf .theme-head,body.leaf .company>h3,body.leaf #sec-github .sec-head,body
 .ref a{color:var(--blue-ink);text-decoration:none}
 .ref a:hover{text-decoration:underline}
 .ref.quote small{color:var(--ink);font-weight:700}
+.item-context{grid-column:2 / -1;display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-top:8px;font-size:12px;color:var(--muted)}
+.fetch-badge{font-weight:700;border:1px solid var(--line);border-radius:4px;padding:0 6px}
+.item-context .related{flex-basis:100%;text-align:left;white-space:normal}
+.excluded-row{padding:16px 0;border-bottom:1px solid var(--line)}
+.excluded-row p{margin:4px 0;font-size:13px;color:var(--muted)}
 .flag{font-size:12px;font-weight:700;color:var(--warn);border:1px solid currentColor;border-radius:4px;padding:0 6px}
 /* キーワードはハッシュタグの見た目 */
 .kws{display:flex;flex-wrap:wrap;gap:2px 10px;margin:0 0 8px}
@@ -512,6 +517,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     <div id="archive-days"></div>
   </section>
 
+  <section id="sec-excluded" hidden><p class="sub">テック判定などで除外した項目です。見出しと判定確率を確認し、元記事を開けます。</p><div id="excluded-items"></div></section>
   <section id="sec-saved" hidden><p class="sub">保存した項目は、掲載日が過ぎてもこのブラウザーに残ります。既読とは別に管理できます。</p><div id="saved-items"></div></section>
 
   <p class="empty" id="empty" hidden>この条件に当てはまる項目はありません。</p>
@@ -527,10 +533,10 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
  "date": "2026-10-03",
  "generated_at": "2026-10-03T07:06:00+09:00",
  "sample": true,
- "lede": "ブックマークはエージェントの運用設計が中心で、公式ブログでもツール連携の更新が続きました。トレンドでは、Jevを試す記事がQiita・Zenn・DevelopersIOのすべてで上位に入っています。",
+ "lede": "ブックマークはエージェントの運用設計が中心で、公式ブログでもツール連携の更新が続きました。トレンドでも、ツール設計や自動実行の改善が話題になっています。",
  "section_summaries": {
   "blogs": "長時間動くエージェントの足場づくりと、実行環境の待ち時間を減らす設定の記事が中心でした。",
-  "trends": "エージェントの実行環境とシークレット管理のリポジトリが伸び、記事では判断特化モデルを試す話題が目立ちました。"
+  "trends": "エージェントの実行環境とシークレット管理のリポジトリが伸び、記事ではツール設計や自動実行を見直す話題が目立ちました。"
  },
  "themes": [
   {"id": "llm_agents", "name": "LLM・AIエージェント", "summary": "ツールの絞り込みや中間成果の保存など、エージェントを実運用で安定させる工夫が中心です。"},
@@ -540,6 +546,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   {"id": "cloud_infra", "name": "クラウド・インフラ", "summary": "マネージドサービスの新機能と、移行の手順がまとまった記事です。"}
  ],
  "picks": ["s1", "s3", "b1"],
+ "pick_audiences": {"s1": "エージェントのツールを設計する開発者", "s3": "定期実行を運用する開発者", "b1": "長時間タスクを実装する開発者"},
  "pick_reasons": {"s1": "エージェントを実運用で安定させる設計の観点を確認できます。", "s3": "毎朝の自動実行に必要な遅延対策を整理できます。", "b1": "長時間タスクを継続する仕組みを公式情報から確認できます。"},
  "trend": [
   {"date": "2026-09-20", "count": 6}, {"date": "2026-09-21", "count": 9}, {"date": "2026-09-22", "count": 4},
@@ -568,7 +575,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
    "article": {"title": "ツールを12個から5個に統合した話", "domain": "example.com", "url": "https://example.com/post/agent-tools", "fetch_status": "ok"},
    "quoted": {"author": "Rin", "handle": "mlnotes_rin", "url": "https://x.com/mlnotes_rin/status/1839999999999999999", "claim": "ツールは多いほどエージェントの能力が上がる、という前提で設計していた。"},
    "points": ["記事: ツールを統合したら誤選択が減った", "ツールの説明に失敗例を1つ添えると効果が大きい"],
-   "keywords": ["ツール設計", "精度"], "importance": 3, "read_min": 6,
+   "keywords": ["ツール設計", "精度"], "importance": 3, "read_min": 6, "related_ids": ["q1"],
    "visual": {"type": "before_after", "label": "ツールの数", "before": {"label": "統合前", "value": 12}, "after": {"label": "統合後", "value": 5}, "unit": "個"}},
   {"id": "s2", "theme": "llm_agents", "author": "Sora Lab", "handle": "sora_ai_lab", "url": "https://x.com/sora_ai_lab/status/1840000000000000004",
    "kind": "post", "title": "長時間タスクは中間成果をファイルに書き出すと安定する",
@@ -615,7 +622,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
    "title": "（サンプル）本文を取れなかった記事は見出しだけを表示する", "url": "https://openai.com/news/",
    "points": [], "keywords": [], "importance": 1, "read_min": 1, "fetch_status": "error"} ],
  "github": [
-  {"id": "g1", "rank": 1, "title": "example/agent-harness", "url": "https://github.com/trending", "language": "TypeScript", "stars_today": 1240, "stars_total": 18300, "theme": "llm_agents", "streak_days": 2,
+  {"id": "g1", "rank": 1, "fetch_status": "ok", "read_min": 5, "changes": {"rank": {"before": 3, "after": 1}, "stars_total": {"before": 17500, "after": 18300}}, "title": "example/agent-harness", "url": "https://github.com/trending", "language": "TypeScript", "stars_today": 1240, "stars_total": 18300, "theme": "llm_agents", "streak_days": 2,
    "summary": "コーディングエージェントを長時間動かすための実行環境。進捗ファイルと再開の仕組みを持つ。", "keywords": ["長時間タスク", "再開性"],
    "visual": {"type": "stat", "value": 1240, "unit": "スター", "label": "今日増えたスター", "compare": {"value": 860, "label": "2位"}}},
   {"id": "g2", "rank": 2, "title": "example/tiny-cli-kit", "url": "https://github.com/trending", "language": "Go", "stars_today": 860, "stars_total": 4100, "theme": "devtools", "streak_days": 1,
@@ -629,8 +636,8 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
    "summary": "PostgreSQLのスキーマの差分を出すツール。"}
  ],
  "articles": [
-  {"id": "q1", "site": "qiita", "rank": 1, "title": "（サンプル）判断特化モデルで問い合わせを振り分けてみた", "url": "https://qiita.com/", "theme": "llm_agents", "streak_days": 2, "summary": "問い合わせを部署に振り分ける処理を、確率付きの判定に置き換えた手順。", "keywords": ["評価"],
-   "visual": {"type": "versus", "a": {"label": "文章生成で分類", "note": "出力の解析が必要"}, "b": {"label": "判定専用モデル", "note": "確率がそのまま使える"}, "winner": "b"}},
+  {"id": "q1", "site": "qiita", "rank": 1, "title": "（サンプル）エージェントのツールを統合する", "url": "https://example.com/post/agent-tools", "related_ids": ["s1"], "fetch_status": "partial", "read_min": 3, "theme": "llm_agents", "streak_days": 2, "summary": "ツールの数を減らし、選択ミスを抑える設計の手順。", "keywords": ["評価"],
+   "visual": {"type": "versus", "a": {"label": "多数のツール", "note": "選択肢が重なりやすい"}, "b": {"label": "統合したツール", "note": "選択ミスを抑える"}, "winner": "b"}},
   {"id": "q2", "site": "qiita", "rank": 2, "title": "（サンプル）GitHub Actionsでcronが遅れる理由", "url": "https://qiita.com/", "theme": "devops", "streak_days": 1, "summary": "正時の混雑で遅れる仕組みと、分をずらす対策。", "keywords": ["cron"]},
   {"id": "q3", "site": "qiita", "rank": 3, "title": "（サンプル）新人向けレビューの粒度", "url": "https://qiita.com/", "theme": "career", "streak_days": 1, "summary": "小さなPRを頻繁に見るほうが学びが多いという整理。"},
   {"id": "z1", "site": "zenn", "rank": 1, "title": "（サンプル）AI開発の時代にテストの役割を見直す", "url": "https://zenn.dev/", "theme": "devtools", "streak_days": 1, "summary": "生成したコードの確認を、テストの書き方から組み立て直す提案。", "keywords": ["保守性"]},
@@ -739,7 +746,18 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   (D.articles || []).forEach(function(p){ p._src = p.site; items.push(p); });
   var byId = {}; items.forEach(function(p){ byId[p.id] = p; });
   function readMin(p){ return p.read_min || 0; }
-  function readingLabel(p){ if (p.article && (p.article.fetch_status === 'blocked' || p.article.fetch_status === 'error')) return '原文の時間は不明'; if (p.article && p.article.fetch_status === 'partial') return '取得部分 約' + readMin(p) + '分'; return (p._src === 'bookmarks' && !p.article ? '投稿' : '原文') + ' 約' + readMin(p) + '分'; }
+  function fetchStatus(p){ return p.fetch_status || (p.article && p.article.fetch_status) || (p._src === 'bookmarks' && !p.article ? 'ok' : 'error'); }
+  function fetchLabel(p){ return {ok: '本文取得済み', partial: '一部取得', blocked: '概要のみ', error: '概要のみ'}[fetchStatus(p)] || '概要のみ'; }
+  function readingLabel(p){ var status = fetchStatus(p); if (status === 'blocked' || status === 'error' || !readMin(p)) return '原文の時間は不明'; return (status === 'partial' ? '取得部分' : p._src === 'bookmarks' && !p.article ? '投稿' : '原文') + ' 約' + readMin(p) + '分'; }
+  function changeLabel(p){
+    if (!p.changes || !Object.keys(p.changes).length) return '昨日から：前日比較なし';
+    var labels = {rank: '順位', stars_today: '当日のスター増加数', stars_total: '累計スター', likes: 'いいね'};
+    return '昨日から：' + Object.keys(labels).filter(function(k){ return p.changes[k]; }).map(function(k){
+      var c = p.changes[k], d = c.after - c.before;
+      if (!d) return labels[k] + ' 変化なし';
+      return k === 'rank' ? '順位 ' + c.before + '→' + c.after : labels[k] + ' 前日比' + (d > 0 ? '+' : '') + d;
+    }).join('／');
+  }
   function isFresh(p){ return !p._carried && !p._savedOnly && (!p.streak_days || p.streak_days < 2); }
   function listingTag(p){
     if (p._carried || p._savedOnly) return null;
@@ -887,14 +905,27 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     var body = el('div');
     body.appendChild(el('strong', null, p.title));
     var who = p._src === 'bookmarks' ? '@' + p.handle : (p._src === 'blogs' ? p.company_label + ' ' + p.blog : SRC[p._src]);
-    body.appendChild(el('span', null, (tName[p.theme] || '') + '／' + who + (readMin(p) ? '／' + readingLabel(p) : '')));
+    body.appendChild(el('span', null, (tName[p.theme] || '') + '／' + who));
     var reason = (D.pick_reasons || {})[id];
-    if (reason) body.appendChild(el('span', {'class': 'pick-reason'}, reason));
+    body.appendChild(el('span', {'class': 'pick-reason'}, '対象読者：' + ((D.pick_audiences || {})[id] || '未設定')));
+    body.appendChild(el('span', {'class': 'pick-reason'}, '読む理由：' + (reason || '未設定')));
+    body.appendChild(el('span', null, '所要時間：' + readingLabel(p)));
     a.appendChild(body);
     a.addEventListener('click', function(e){ e.preventDefault(); goTo(p.id); });
     picks.appendChild(a);
   });
   if (!picks.children.length) document.getElementById('picks-sec').hidden = true;
+
+  var changesBox = el('section', {'class': 'changes-summary'});
+  changesBox.appendChild(el('h3', null, '昨日から変わった点'));
+  var changed = items.filter(function(p){ return p.changes && Object.keys(p.changes).some(function(k){ return p.changes[k].before !== p.changes[k].after; }); });
+  changed.forEach(function(p){
+    var row = el('p'), b = el('button', {'type': 'button', 'class': 'clear related'}, p.title);
+    b.addEventListener('click', function(){ goTo(p.id); }); row.appendChild(b);
+    row.appendChild(el('span', null, ' · ' + changeLabel(p))); changesBox.appendChild(row);
+  });
+  if (!changed.length) changesBox.appendChild(el('p', {'class': 'sub'}, items.some(function(p){ return p.changes && Object.keys(p.changes).length; }) ? '比較できる掲載項目の順位・数値に変化はありません。' : '比較できる前日の掲載データがありません。'));
+  document.getElementById('ov').appendChild(changesBox);
 
   // ---------- 図解 ----------
   var pending = [];
@@ -1245,13 +1276,22 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     node._rb = rb; node._sb = saveButton(p); node._lb = feedbackButton(p, 'up'); node._db = feedbackButton(p, 'down');
     var actions = el('span', {'class': 'item-actions'}); rb.parentNode.insertBefore(actions, rb);
     actions.appendChild(node._lb); actions.appendChild(node._db); actions.appendChild(node._sb); actions.appendChild(rb);
+    var context = el('div', {'class': 'item-context'});
+    context.appendChild(el('span', {'class': 'fetch-badge'}, fetchLabel(p)));
+    if (['github', 'qiita', 'zenn', 'devio'].indexOf(p._src) >= 0) context.appendChild(el('span', null, changeLabel(p)));
+    (p.related_ids || []).forEach(function(id){
+      var other = byId[id]; if (!other || other._carried || other._savedOnly) return;
+      var b = el('button', {'class': 'clear related', 'type': 'button'}, '同じ記事：' + SRC[other._src] + ' · ' + other.title);
+      b.addEventListener('click', function(){ goTo(id); }); context.appendChild(b);
+    });
+    (node.querySelector('.x-main') || node).appendChild(context);
     node.setAttribute('tabindex', '-1'); itemEls[p.id] = node; node.style.setProperty('--c', cvar(p.theme));
   }
   function points(p){
     if (!p.points || !p.points.length) return null;
     var ul = el('ul'); p.points.forEach(function(pt){ ul.appendChild(el('li', null, pt)); }); return ul;
   }
-  var FETCH_FLAG = {partial: '本文の一部のみ', blocked: '本文未取得', error: '本文未取得'};
+
 
   // ---------- ブックマーク ----------
   // カードは見出しだけを並べ、押すと中身を開く。必読（importance 3）は最初から開いておく
@@ -1302,7 +1342,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
         r.appendChild(el('span', {'class': 'r-title'}, p.article.title || p.article.domain || ''));
         var m = el('span', {'class': 'r-meta'});
         m.appendChild(el('span', null, p.article.domain || ''));
-        if (FETCH_FLAG[p.article.fetch_status]) m.appendChild(el('span', {'class': 'flag'}, FETCH_FLAG[p.article.fetch_status]));
+
         if (safeUrl(p.article.url)) m.appendChild(link(p.article.url, '記事を開く'));
         r.appendChild(m); body.appendChild(r);
       }
@@ -1587,7 +1627,7 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
   }
   var companies2 = (D.blog_companies && D.blog_companies.length) ? D.blog_companies
     : (D.blogs || []).reduce(function(a, b){ if (!a.some(function(c){ return c.company === b.company; })) a.push({company: b.company, label: b.company_label, status: 'ok'}); return a; }, []);
-  var NAV = [{view: 'overview', label: '概要', top: true}, {view: 'all', label: '今日の一覧', top: true}, {view: 'saved', label: 'あとで読む', top: true}];
+  var NAV = [{view: 'overview', label: '概要', top: true}, {view: 'all', label: '今日の一覧', top: true}, {view: 'saved', label: 'あとで読む', top: true}, {view: 'excluded', label: '除外された項目', top: true}];
   if (carried.length) NAV.push({view: 'co', label: '前日までの未読', top: true});
   if (archRows.length) NAV.push({view: 'archive', label: '過去の日報', top: true});
   NAV.push({view: 'bm', label: 'ブックマーク', top: true, grp: true, status: statusBy.bookmarks && statusBy.bookmarks.status});
@@ -1631,11 +1671,22 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     b.addEventListener('click', function(){ setView(n.view); closeSide(); });
     n.btn = b; li.appendChild(b); navEl.appendChild(li);
   });
+  var excluded = D.excluded || [], excludedEl = document.getElementById('excluded-items');
+  excluded.forEach(function(p){
+    var row = el('article', {'class': 'excluded-row'});
+    row.appendChild(link(p.url, p.title));
+    row.appendChild(el('p', null, SRC[p.source] + '／テック判定確率：' + (num(p.tech_prob) ? Math.round(p.tech_prob * 100) + '%' : '不明')));
+    excludedEl.appendChild(row);
+  });
+  var reviewExcluded = el('button', {'type': 'button', 'class': 'clear'}, '除外された項目 ' + excluded.length + '件を確認');
+  reviewExcluded.addEventListener('click', function(){ setView('excluded'); });
+  document.getElementById('daily-note').appendChild(reviewExcluded);
   function countNav(){
     NAV.forEach(function(n){
       n.btn.setAttribute('aria-current', state.view === n.view ? 'page' : 'false');
       n.cnt.textContent = ''; n.cnt.className = 'cnt';
       if (n.view === 'overview') return;
+      if (n.view === 'excluded') { n.cnt.textContent = excluded.length + '件'; return; }
       if (n.view === 'archive') { n.cnt.textContent = archRows.length + '件'; return; }
       var list = allItems.filter(function(p){ return inView(p, n.view); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
       if (!list.length) { n.cnt.textContent = n.status === 'error' ? '取得失敗' : n.view === 'saved' ? '0件' : '更新なし'; if (n.status === 'error') n.cnt.classList.add('err'); return; }
@@ -1776,6 +1827,8 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     var secArch = document.getElementById('sec-archive');
     secArch.hidden = !archShown && v !== 'archive'; secArch.classList.toggle('solo', v === 'archive');
     shown += archShown;
+    document.getElementById('sec-excluded').hidden = v !== 'excluded';
+    if (v === 'excluded') shown += excluded.length;
     [['sec-bookmarks', 'bm'], ['sec-blogs', 'blog'], ['sec-trends', 'tr'], ['sec-carry', 'co'], ['sec-saved', 'saved']].forEach(function(s){
       var sec = document.getElementById(s[0]);
       sec.hidden = !(groups.some(function(g){ return !g.hidden && sec.contains(g); }) || v === s[1]);
@@ -1808,7 +1861,8 @@ footer{margin-top:32px;font-size:13px;color:var(--ink2)}
     var vm = document.getElementById('view-meta'); vm.textContent = '';
     if (!ov) {
       var list = allItems.filter(function(p){ return inView(p, v); }), unread = list.filter(function(p){ return !read[p.id]; }).length;
-      if (v === 'archive') vm.appendChild(document.createTextNode(shown + '件表示／全' + archRows.length + '件（直近' + (D.archive || []).length + '日分）'));
+      if (v === 'excluded') vm.appendChild(document.createTextNode(excluded.length + '件（通常の一覧には含めません）'));
+      else if (v === 'archive') vm.appendChild(document.createTextNode(shown + '件表示／全' + archRows.length + '件（直近' + (D.archive || []).length + '日分）'));
       else {
         var archTotal = v === 'search' ? archRows.filter(archMatches).length : 0;
         vm.appendChild(document.createTextNode(shown + '件表示／全' + (list.length + archTotal) + '件（未読 ' + unread + '件' + (archTotal ? '・過去の日報 ' + archTotal + '件' : '') + '）'));
